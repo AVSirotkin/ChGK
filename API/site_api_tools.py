@@ -44,7 +44,10 @@ class ChGK_API_connector:
         if self.use_cache:
             if str(idtournament) in self.API_cache["tournament_results"]:
                 return self.API_cache["tournament_results"][str(idtournament)]
-        results = requests.get("https://api.rating.chgk.net/tournaments/"+str(idtournament)+"/results?includeTeamMembers=0&includeMasksAndControversials=0&includeTeamFlags=0&includeRatingB=1").json()
+        results = requests.get("https://api.rating.chgk.net/tournaments/"+str(idtournament)+"/results?includeTeamMembers=1&includeMasksAndControversials=1&includeTeamFlags=0&includeRatingB=1", headers={'accept': 'application/json'}
+).json()
         if self.use_cache:
-            self.API_cache["tournament_results"][str(idtournament)] = results["hydra:member"] #TODO: think about removing hydra, by request options
-        return results["hydra:member"]
+            self.API_cache["tournament_results"][str(idtournament)] = results
+        return results
+
+  
