@@ -231,9 +231,3 @@ for t in ordered_tournament_ids[-122:]:
 print(WB, WC, D)
 
 print(NWB, NWC, ND)
-
-
-
-player_ratings[4121]
-player_ratings[115199]
-player_ratings[76084]
