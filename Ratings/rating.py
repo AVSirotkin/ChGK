@@ -6,9 +6,10 @@ from datetime import datetime, timedelta
 import json
 import math
 import sys
-import json
 sys.path.append('./API/')
 from site_api_tools import ChGK_API_connector
+import sqlite3
+
 
 MIN_QUESTION_RATING = 0
 MAX_QUESTION_RATING = 10000
@@ -218,131 +219,190 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
     print("Totaly: " + str(datetime.now() - start_time))
     return (player_based_team_ratings, question_values, player_delta, score)
 
+def process_all_data(SUB_DIR = "Output/TEST"):
 
+    team_rates = {}
+    player_ratings = {}
+    connector = ChGK_API_connector()
+    save_data = True
 
-team_rates = {}
-player_ratings = {}
-connector = ChGK_API_connector()
+    DBconn = sqlite3.connect(r'Output/rating.db')
+    cursor = DBconn.cursor()
+    # DBconn.executescript("DELETE FROM playerratings")
 
-connector.load_cache("cache.json")
+    connector.load_cache("cache.json")
 
-with open('tournaments.json', 'r', encoding="utf8") as JSON:
-    tournaments_info_list = json.load(JSON)
+    # with open('tournaments.json', 'r', encoding="utf8") as JSON:
+    #     tournaments_info_list = json.load(JSON)
 
-tournament_info_dict = {}
-for t in tournaments_info_list:
-    tournament_info_dict[t["id"]] = t
+    tournaments_info_list = connector.get_all_rated_tournaments()
 
-ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2022-09-29"]
-ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
+    with open("tournaments.json", "w") as file:
+        json.dump(tournaments_info_list, file)
 
-results = {}
-release_results = {0:{}}
+    tournament_info_dict = {}
+    for t in tournaments_info_list:
+        tournament_info_dict[t["id"]] = t
 
-cnt = 0
+    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2023-09-29"]
+    # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2021-09-16"]
+    ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
 
-release_date = datetime(year = 2021, month = 9, day = 2) 
-release_num = 0
-tournaments_by_reliases = [[]]
+    results = {}
+    release_results = {0:{}}
 
-print_data = True
-SUB_DIR = "TEST2"
-if print_data:
-    try:
-        os.mkdir(SUB_DIR)
-    except:
-        pass
+    cnt = 0
 
-for t in ordered_tournament_ids[:]:
+    release_date = datetime(year = 2021, month = 9, day = 2) 
+    release_num = 0
+    tournaments_by_reliases = [[]]
 
-    start = datetime.now()
-    print("Process tournament "+str(t)+ " start at "+str(start))
-    data = connector.tournament_results(t)
-    print("Data get took "+str(datetime.now() - start))
-
-
-    while not tournament_info_dict[t]["dateEnd"] < str(release_date):
-        for tid in tournaments_by_reliases[-1]:
-            for pid in results[tid]["delta_players"]:
-                player_ratings[pid] += results[tid]["delta_players"][pid]
-            release_results[release_num]["player_ratings"] = deepcopy(player_ratings)
-        
-        tournaments_by_reliases.append([])
-        release_num += 1
-        release_date += timedelta(days = 7)
-        release_results[release_num] = {"release_date": str(release_date)}
-        print("Start working on reliase "+str(release_num)+":  "+str(release_date))
-    
-    questionQty = 0
-    # print(tournament_info_dict[t]["questionQty"])
-    for qqt in tournament_info_dict[t]["questionQty"]:
-        questionQty += tournament_info_dict[t]["questionQty"][qqt]
-
-
-    delta, qv, delta_pl, score = process_one_tournament(team_rates, data, player_ratings, True, questionQty)
-
+    print_data = True
+  
     if print_data:
-        team_places = sorted([x for x in delta], key = lambda x: -delta[x])
-        fname = SUB_DIR + "/" + str(release_num)+"_"+str(t)+".csv"
-        f = open(fname, "w", encoding="utf-8")
-        bytes = f.write("Команда; рейтинг; число игроков; место; ожидаемое место; взято вопросов; ожидаемое число взятых вопросов\n")
-        for my_t in data:
-            if (not (my_t["mask"] == None)) |  (not (my_t["questionsTotal"] == None)):
-                if my_t["team"]["id"] in delta:
-                    bytes = f.write(my_t["current"]["name"] + "; " +str(delta[my_t["team"]["id"]])+ "; " +str(len(my_t["teamMembers"])) +"; "+ str(my_t["position"]) + "; " + str(team_places.index(my_t["team"]["id"])+1)+"; " + str(my_t["questionsTotal"]) + "; " + str(ELO_estimate(delta[my_t["team"]["id"]], qv))+"\n")
-        f.close()
+        try:
+            os.mkdir(SUB_DIR)
+        except:
+            pass
 
-    
-    results[t] = {}
-    results[t]["qv"] = qv
-    results[t]["delta_players"] = delta_pl
-    results[t]["team_rates"] = delta
-    results[t]["score"] = score
-    
-    tournaments_by_reliases[-1].append(t)
-#    for pl in delta_pl:
-#        player_ratings[pl] += delta_pl[pl]
-    cnt += 1
+    for t in ordered_tournament_ids[:]:
 
-for tid in tournaments_by_reliases[-1]:
-    for pid in results[tid]["delta_players"]:
-        player_ratings[pid] += results[tid]["delta_players"][pid]
+        start = datetime.now()
+        print("Process tournament "+str(t)+ " start at "+str(start))
+        data = connector.tournament_results(t, True)
+        print("Data get took "+str(datetime.now() - start))
+
+
+        while not tournament_info_dict[t]["dateEnd"] < str(release_date):
+            records = []
+            for tid in tournaments_by_reliases[-1]:
+                for pid in results[tid]["delta_players"]:
+                    player_ratings[pid] += results[tid]["delta_players"][pid]
+                    records.append((release_num, pid, results[tid]["delta_players"][pid], tid))
+
+            #insert multiple records in a single query
+            cursor.executemany('INSERT INTO playerratingsdelta VALUES(?,?,?,?);',records)
+
+            release_results[release_num]["player_ratings"] = deepcopy(player_ratings)
+            
+            records = []
+            for pid in player_ratings:
+                records.append((release_num, pid, player_ratings[pid]))
+
+            #insert multiple records in a single query
+            cursor.executemany('INSERT INTO playerratings VALUES(?,?,?);',records)
+            
+            tournaments_by_reliases.append([])
+            release_num += 1
+            release_date += timedelta(days = 7)
+            release_results[release_num] = {"release_date": str(release_date)}
+            print("Start working on reliase "+str(release_num)+":  "+str(release_date))
+        
+        questionQty = 0
+        # print(tournament_info_dict[t]["questionQty"])
+        for qqt in tournament_info_dict[t]["questionQty"]:
+            questionQty += tournament_info_dict[t]["questionQty"][qqt]
+
+
+        delta, qv, delta_pl, score = process_one_tournament(team_rates, data, player_ratings, True, questionQty)
+
+        if print_data:
+            team_places = sorted([x for x in delta], key = lambda x: -delta[x])
+            fname = SUB_DIR + "/" + str(release_num)+"_"+str(t)+".csv"
+            f = open(fname, "w", encoding="utf-8")
+            bytes = f.write("Команда; рейтинг; число игроков; место; ожидаемое место; взято вопросов; ожидаемое число взятых вопросов\n")
+            for my_t in data:
+                if (not (my_t["mask"] == None)) |  (not (my_t["questionsTotal"] == None)):
+                    if my_t["team"]["id"] in delta:
+                        bytes = f.write(my_t["current"]["name"] + "; " +str(delta[my_t["team"]["id"]])+ "; " +str(len(my_t["teamMembers"])) +"; "+ str(my_t["position"]) + "; " + str(team_places.index(my_t["team"]["id"])+1)+"; " + str(my_t["questionsTotal"]) + "; " + str(ELO_estimate(delta[my_t["team"]["id"]], qv))+"\n")
+            f.close()
+        
+        
+        if save_data:
+            tournamentrating_data = []
+            results_data = []
+            roster_data = []
+            team_places = sorted([x for x in delta], key = lambda x: -delta[x])
+            for my_t in data:
+                if (not (my_t["mask"] == None)) |  (not (my_t["questionsTotal"] == None)):
+                    if my_t["team"]["id"] in delta:
+                        tournamentrating_data.append((t, my_t["team"]["id"], delta[my_t["team"]["id"]], ELO_estimate(delta[my_t["team"]["id"]], qv)))
+                        results_data.append((t, my_t["team"]["id"], my_t["position"], my_t["questionsTotal"], my_t["mask"], my_t["current"]["name"]))
+                        for pld in my_t["teamMembers"]:
+                            roster_data.append((t, pld["player"]["id"], my_t["team"]["id"]))
+                        
+                        # bytes = f.write(my_t["current"]["name"] + "; " +str(delta[my_t["team"]["id"]])+ "; " +str(len(my_t["teamMembers"])) +"; "+ str(my_t["position"]) + "; " + str(team_places.index(my_t["team"]["id"])+1)+"; " + str(my_t["questionsTotal"]) + "; " + str(ELO_estimate(delta[my_t["team"]["id"]], qv))+"\n")
+            
+        cursor.executemany('INSERT INTO roster VALUES(?,?,?);',roster_data)        
+        cursor.executemany('INSERT INTO tournamentratings VALUES(?,?,?,?);',tournamentrating_data)    
+        cursor.executemany('INSERT INTO results VALUES(?,?,?,?,?,?);',results_data)        
+        
+        results[t] = {}
+        results[t]["qv"] = qv
+        results[t]["delta_players"] = delta_pl
+        results[t]["team_rates"] = delta
+        results[t]["score"] = score
+        
+        tournaments_by_reliases[-1].append(t)
+    #    for pl in delta_pl:
+    #        player_ratings[pl] += delta_pl[pl]
+        cnt += 1
+
+    records = []
+    for tid in tournaments_by_reliases[-1]:
+        for pid in results[tid]["delta_players"]:
+            player_ratings[pid] += results[tid]["delta_players"][pid]
+            records.append((release_num, pid, results[tid]["delta_players"][pid], tid))
+
+    #insert multiple records in a single query
+    cursor.executemany('INSERT INTO playerratingsdelta VALUES(?,?,?,?);',records)    
+
     release_results[release_num]["player_ratings"] = deepcopy(player_ratings)
+    
+    records = []
+    for pid in player_ratings:
+        records.append((release_num, pid, player_ratings[pid]))
+
+    cursor.executemany('INSERT INTO playerratings VALUES(?,?,?);',records)
+
+    DBconn.commit()
+    DBconn.close()
+
+    connector.save_cache("cache.json")
+    ## Models comparison
+
+    WB = 0
+    WC = 0
+    D = 0
+    NWB = 0
+    NWC = 0
+    ND = 0
+
+    ordered_tournament_ids[-3:]
+
+    for t in ordered_tournament_ids[-122:]:
+        print(t, results[t]["score"]["NDCG"]["B"], results[t]["score"]["NDCG"]["C"])
 
 
-connector.save_cache("cache.json")
-## Models comparison
+    for t in ordered_tournament_ids[-122:]:
+        print(results[t]["score"]["spearman"]["B"][0], results[t]["score"]["spearman"]["C"][0])
+        if results[t]["score"]["spearman"]["B"][0] > results[t]["score"]["spearman"]["C"][0]: WB += 1
+        if results[t]["score"]["spearman"]["B"][0] < results[t]["score"]["spearman"]["C"][0]: WC += 1
+        if results[t]["score"]["spearman"]["B"][0] == results[t]["score"]["spearman"]["C"][0]: D += 1
+        if results[t]["score"]["NDCG"]["B"] > results[t]["score"]["NDCG"]["C"]: NWB += 1
+        if results[t]["score"]["NDCG"]["B"] < results[t]["score"]["NDCG"]["C"]: NWC += 1
+        if results[t]["score"]["NDCG"]["B"] == results[t]["score"]["NDCG"]["C"]: ND += 1
 
-WB = 0
-WC = 0
-D = 0
-NWB = 0
-NWC = 0
-ND = 0
-
-ordered_tournament_ids[-3:]
-
-for t in ordered_tournament_ids[-122:]:
-    print(t, results[t]["score"]["NDCG"]["B"], results[t]["score"]["NDCG"]["C"])
+    print(WB, WC, D)
+    print(NWB, NWC, ND)
 
 
-for t in ordered_tournament_ids[-122:]:
-    print(results[t]["score"]["spearman"]["B"][0], results[t]["score"]["spearman"]["C"][0])
-    if results[t]["score"]["spearman"]["B"][0] > results[t]["score"]["spearman"]["C"][0]: WB += 1
-    if results[t]["score"]["spearman"]["B"][0] < results[t]["score"]["spearman"]["C"][0]: WC += 1
-    if results[t]["score"]["spearman"]["B"][0] == results[t]["score"]["spearman"]["C"][0]: D += 1
-    if results[t]["score"]["NDCG"]["B"] > results[t]["score"]["NDCG"]["C"]: NWB += 1
-    if results[t]["score"]["NDCG"]["B"] < results[t]["score"]["NDCG"]["C"]: NWC += 1
-    if results[t]["score"]["NDCG"]["B"] == results[t]["score"]["NDCG"]["C"]: ND += 1
+    with open(SUB_DIR+"/results.json", "w") as file:
+        json.dump(results, file)
 
-print(WB, WC, D)
-print(NWB, NWC, ND)
+    with open(SUB_DIR+"/release_results.json", "w") as file:
+        json.dump(release_results, file)
 
 
-with open(SUB_DIR+"/results.json", "w") as file:
-    json.dump(results, file)
-
-with open(SUB_DIR+"/release_results.json", "w") as file:
-    json.dump(release_results, file)
-
-
+if __name__ == "__main__":
+    process_all_data()

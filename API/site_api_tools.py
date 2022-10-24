@@ -40,6 +40,35 @@ class ChGK_API_connector:
                 Tournaments_list.append(s["idtournament"])
         return Tournaments_list
     
+    def get_all_tournaments_id_for_player(self, player_id):
+        r = requests.get(BASE_CHGK_API_URL+"/players/"+str(player_id)+"/tournaments?page=1&itemsPerPage=0&pagination=false", headers={'accept': 'application/json'})
+        Tournaments_list = []
+        infoA = r.json()
+        for s in infoA:
+            if s["idtournament"] not in Tournaments_list:
+                Tournaments_list.append(s["idtournament"])
+        return Tournaments_list
+
+    def get_all_tournaments_for_player(self, player_id):
+        r = requests.get(BASE_CHGK_API_URL+"/players/"+str(player_id)+"/tournaments?page=1&itemsPerPage=0&pagination=false", headers={'accept': 'application/json'})
+#        Tournaments_list = []
+        infoA = r.json()
+        return infoA
+
+    def get_tournament_team_info(self, tournament_id, team_id):
+        tr = self.tournament_results(tournament_id)
+        for t in tr:
+            if str(t["team"]["id"]) == str(team_id):
+                return(t["teamMembers"])
+        return []
+    
+    def get_all_rated_tournaments(self):
+        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page=1&itemsPerPage=1000&properties.maiiRating=true", headers={'accept': 'application/json'})
+#        Tournaments_list = []
+        infoA = r.json()
+        return infoA
+ 
+
     def tournament_results(self, idtournament, forced = False):
         if self.use_cache and not forced:
             if str(idtournament) in self.API_cache["tournament_results"]:
