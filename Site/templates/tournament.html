@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <table id="Tournament" class="table table-striped">
+    <thead>
+      <tr>
+        <th>Место</th>
+        <th>Команда</th>
+        <th>Сила команды</th>
+        <th>Взято вопросов</th>
+        <th>Прогноз по вопросам</th>
+        <th>Дельта</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tourresult in tourresults %}
+        <tr>
+          <td>{{ tourresult.place }}</td>
+          <td>{{ tourresult.teamname }}</td>
+          <td>{{ tourresult.teamrating }}</td>
+          <td>{{ tourresult.totalquestions }}</td>
+          <td>{{ tourresult.predictedquestions }}</td>
+          <td>{{ tourresult.totalquestions - tourresult.predictedquestions }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+{% endblock %}

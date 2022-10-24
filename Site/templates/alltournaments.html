@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <table id="Tournament" class="table table-striped">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Название</th>
+        <th>Дата окончания</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tours in toursinfo %}
+        <tr>
+          <td>{{ tours.tournamentid }}</td>
+          <td><a href="/tournament/{{ tours.tournamentid }}">{{ tours.name }}</a></td>
+          <td>{{ tours.enddate }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+{% endblock %}
