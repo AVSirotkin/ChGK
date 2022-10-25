@@ -1,6 +1,7 @@
 import sqlite3
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 import datetime
+import time
 
 app = Flask(__name__)
 
@@ -22,12 +23,19 @@ def about():
 @app.route('/players')
 @app.route("/players/<int:season>")
 def showAllPlayers(season = 0):
+    page = request.args.get('page', 1, type=int)
+    ts = time.time()
     conn = get_db_connection()
     if season == 0:
-        tmp = conn.execute('SELECT * FROM playerratings ORDER BY releaseid DESC').fetchall()
+        tmp = conn.execute('SELECT MAX(releaseid) as releaseid FROM playerratings').fetchall()
         season = int(tmp[0]["releaseid"])
-    ratings = conn.execute('SELECT players.playerid as playerid, players.full_name as full_name, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC').fetchall()
+    t1 = time.time()
+    print(page, t1-ts)
+    ratings = conn.execute('SELECT players.playerid as playerid, players.full_name as full_name, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
+    # ratings = conn.execute('SELECT players.playerid as playerid, players.full_name as full_name, pr.playerrating as playerrating, pr.releaseid as releaseid FROM (SELECT * FROM playerratings WHERE releaseid='+str(season)+' ORDER BY playerrating DESC LIMIT 500) as pr JOIN players ON pr.playerid=players.playerid ORDER BY pr.playerrating DESC LIMIT 500').fetchall()
     #players.playerid as playerid, players.full_name as full_name, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid
+    t2= time.time()
+    print(t2 - t1, len(ratings))
     conn.close()
     return render_template("allplayers.html", ratings=ratings)
 

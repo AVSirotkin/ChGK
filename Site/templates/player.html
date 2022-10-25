@@ -1,24 +1,6 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <table id="ratings" class="table table-striped">
-    <thead>
-      <tr>
-        <th>Release</th>
-        <th>Rating</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for rating in ratings %}
-        <tr>
-          <td>{{ rating.releaseid }}</td>
-          <td>{{ rating.playerrating }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-
   <table id="deltas" class="table table-striped">
     <thead>
       <tr>
@@ -37,4 +19,23 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <table id="ratings" class="table table-striped">
+    <thead>
+      <tr>
+        <th>Release</th>
+        <th>Rating</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rating in ratings %}
+        <tr>
+          <td>{{ rating.releaseid }}</td>
+          <td>{{ rating.playerrating }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+
 {% endblock %}
