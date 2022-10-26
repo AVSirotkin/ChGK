@@ -88,11 +88,11 @@ def read_cfg():
     except Exception:
         pass    
     if website_url == "":
-        website_url = 'chgk.fun:5000'
+        website_url = 'chgk.fun'
     return website_url
 
 if __name__ == "__main__":
     website_url = read_cfg()
     print(website_url)
     app.config['SERVER_NAME'] = website_url
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
