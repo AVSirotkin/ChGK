@@ -11,10 +11,17 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+
+@app.route('/', subdomain="rating")
+def index():
+    return "secret rating page"
+
+
+
+
 @app.route('/')
 def index():
     return "Hello World"
-
 
 @app.route('/about')
 def about():
@@ -74,6 +81,18 @@ def showAllTournaments():
     return render_template("alltournaments.html", toursinfo=tournaments)
     
 
+def read_cfg():
+    website_url = ""
+    try:
+        with open("site.cfg") as cfg_file:
+            website_url = cfg_file.readline().strip()
+    except Exception:
+        pass    
+    if website_url == "":
+        website_url = 'chgk.fun:5000'
+    return website_url
 
 if __name__ == "__main__":
+    website_url = read_cfg()
+    app.config['SERVER_NAME'] = website_url
     app.run(debug=True)
