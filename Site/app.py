@@ -26,8 +26,8 @@ def index():
 def about():
     return "About page"
 
-@app.route('/players')
-@app.route("/players/<int:season>")
+@app.route('/players', subdomain="rating")
+@app.route("/players/<int:season>", subdomain="rating")
 def showAllPlayers(season = 0):
     page = request.args.get('page', 1, type=int)
     ts = time.time()
@@ -46,7 +46,7 @@ def showAllPlayers(season = 0):
     return render_template("allplayers.html", ratings=ratings)
 
 
-@app.route("/player/<int:playerid>")
+@app.route("/player/<int:playerid>", subdomain="rating")
 def showPlayerInfo(playerid):
     conn = get_db_connection()
     deltas = conn.execute('SELECT * FROM playerratingsdelta WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
@@ -54,7 +54,7 @@ def showPlayerInfo(playerid):
     conn.close()
     return render_template("player.html", ratings=ratings, deltas=deltas)
 
-@app.route("/tournament/<int:tournamentid>")
+@app.route("/tournament/<int:tournamentid>", subdomain="rating")
 def showTournamentInfo(tournamentid):
     conn = get_db_connection()
     tournaments = conn.execute('SELECT * FROM results '+
@@ -70,7 +70,7 @@ def showTournamentInfo(tournamentid):
     
 
 
-@app.route("/tournaments")
+@app.route("/tournaments", subdomain="rating")
 def showAllTournaments():
     today = datetime.datetime.now()
     conn = get_db_connection()
