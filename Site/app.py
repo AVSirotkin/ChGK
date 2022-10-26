@@ -13,9 +13,8 @@ def get_db_connection():
 
 
 @app.route('/', subdomain="rating")
-def index():
+def ratingindex():
     return "secret rating page"
-
 
 
 
@@ -94,5 +93,6 @@ def read_cfg():
 
 if __name__ == "__main__":
     website_url = read_cfg()
+    print(website_url)
     app.config['SERVER_NAME'] = website_url
     app.run(debug=True)
