@@ -49,7 +49,7 @@ def showAllPlayers(season = 0):
 @app.route("/player/<int:playerid>", subdomain="rating")
 def showPlayerInfo(playerid):
     conn = get_db_connection()
-    deltas = conn.execute('SELECT * FROM playerratingsdelta WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
+    deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
     ratings = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
     conn.close()
     return render_template("player.html", ratings=ratings, deltas=deltas)
@@ -68,7 +68,20 @@ def showTournamentInfo(tournamentid):
     conn.close()
     return render_template("tournament.html", tourresults=tournaments)
     
-
+@app.route("/team/<int:teamid>", subdomain="rating")
+def showTeamInfo(teamid):
+    conn = get_db_connection()
+    tournaments = conn.execute('SELECT * FROM results '+
+    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' + 
+    ' JOIN tournaments ON results.tournamentid=tournaments.tournamentid' + 
+    ' WHERE results.teamid = '+str(teamid) + 
+    ' ORDER BY tournaments.enddate DESC'
+    ).fetchall()
+    # print(tuple(tournaments[0]))
+    # print(tournaments[0].keys())
+    # print(tournaments[0]['teamid'])
+    conn.close()
+    return render_template("team.html", tourresults=tournaments)
 
 @app.route("/tournaments", subdomain="rating")
 def showAllTournaments():

@@ -4,27 +4,28 @@
   <table id="deltas" class="table table-striped">
     <thead>
       <tr>
-        <th>ReleaseId</th>
-        <th>TournamentId</th>
-        <th>deltaRating</th>
+        <th>Релиз</th>
+        <th>Турнир</th>
+        <th>Дельта</th>
       </tr>
     </thead>
     <tbody>
       {% for delta in deltas %}
         <tr>
             <td>{{ delta.releaseid }}</td>
-            <td><a href="/tournament/{{ delta.tournamentid }}">{{ delta.tournamentid }}</a></td>
+            <td><a href="/tournament/{{ delta.tournamentid }}">{{ delta.name }}</a></td>
             <td>{{ delta.deltarating }}</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 
+  История рейтинга
   <table id="ratings" class="table table-striped">
     <thead>
       <tr>
-        <th>Release</th>
-        <th>Rating</th>
+        <th>Релиз</th>
+        <th>Рейтинг</th>
       </tr>
     </thead>
     <tbody>

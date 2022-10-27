@@ -6,8 +6,11 @@ from datetime import datetime, timedelta
 import json
 import math
 import sys
-sys.path.append('./API/')
-from site_api_tools import ChGK_API_connector
+
+sys.path.append('..')
+sys.path.append('.')
+from API.site_api_tools import ChGK_API_connector
+#from API.site_api_tools import ChGK_API_connector
 import sqlite3
 
 
@@ -34,6 +37,15 @@ def independed_ELO(R_list, Q, base = ELO_BASE, norm = ELO_NORM):
 
 def ELO_estimate(R, rates, base = ELO_BASE, norm = ELO_NORM):
     return sum([ELO(R, r, base, norm) for r in rates])
+
+def estimate_p_values(R, rates, N, base = ELO_BASE, norm = ELO_NORM):
+    p = [0.0]*(len(rates)+2)
+    p[0] = 1
+    for i in range(len(rates)):
+        pq = ELO(R, rates[i], base, norm)
+        for j in range(i+2):
+            p[i+1-j] = p[i+1-j] * (1-pq) + p[i-j] * pq
+    return (sum(p[:N+1]), sum(p[N:]))
 
 def max_like(R, rates, gets, is_team = True, max_steps = 10000, eps = 0.00001, base = ELO_BASE, norm = ELO_NORM):
 #    start_time = datetime.now()
@@ -244,7 +256,7 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     for t in tournaments_info_list:
         tournament_info_dict[t["id"]] = t
 
-    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2023-09-29"]
+    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2022-10-21"]
     # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2021-09-16"]
     ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
 
@@ -269,7 +281,7 @@ def process_all_data(SUB_DIR = "Output/TEST"):
 
         start = datetime.now()
         print("Process tournament "+str(t)+ " start at "+str(start))
-        data = connector.tournament_results(t, True)
+        data = connector.tournament_results(t, False)
         print("Data get took "+str(datetime.now() - start))
 
 
@@ -326,7 +338,8 @@ def process_all_data(SUB_DIR = "Output/TEST"):
             for my_t in data:
                 if (not (my_t["mask"] == None)) |  (not (my_t["questionsTotal"] == None)):
                     if my_t["team"]["id"] in delta:
-                        tournamentrating_data.append((t, my_t["team"]["id"], delta[my_t["team"]["id"]], ELO_estimate(delta[my_t["team"]["id"]], qv)))
+                        atmost, atleast = estimate_p_values(delta[my_t["team"]["id"]], qv, my_t["questionsTotal"])
+                        tournamentrating_data.append((t, my_t["team"]["id"], delta[my_t["team"]["id"]], ELO_estimate(delta[my_t["team"]["id"]], qv), atleast, atmost))
                         results_data.append((t, my_t["team"]["id"], my_t["position"], my_t["questionsTotal"], my_t["mask"], my_t["current"]["name"]))
                         for pld in my_t["teamMembers"]:
                             roster_data.append((t, pld["player"]["id"], my_t["team"]["id"]))
@@ -334,7 +347,7 @@ def process_all_data(SUB_DIR = "Output/TEST"):
                         # bytes = f.write(my_t["current"]["name"] + "; " +str(delta[my_t["team"]["id"]])+ "; " +str(len(my_t["teamMembers"])) +"; "+ str(my_t["position"]) + "; " + str(team_places.index(my_t["team"]["id"])+1)+"; " + str(my_t["questionsTotal"]) + "; " + str(ELO_estimate(delta[my_t["team"]["id"]], qv))+"\n")
             
         cursor.executemany('INSERT INTO roster VALUES(?,?,?);',roster_data)        
-        cursor.executemany('INSERT INTO tournamentratings VALUES(?,?,?,?);',tournamentrating_data)    
+        cursor.executemany('INSERT INTO tournamentratings VALUES(?,?,?,?,?,?);',tournamentrating_data)    
         cursor.executemany('INSERT INTO results VALUES(?,?,?,?,?,?);',results_data)        
         
         results[t] = {}

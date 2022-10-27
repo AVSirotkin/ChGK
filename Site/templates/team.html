@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <table id="Tournament" class="table table-striped">
+  <table id="Tournaments" class="table table-striped">
     <thead>
       <tr>
+        <th rowspan="2">Турнир</th>
         <th rowspan="2">Место</th>
-        <th rowspan="2">Команда</th>
         <th rowspan="2">Сила команды</th>
         <th rowspan="2">Взято вопросов</th>
         <th rowspan="2">Прогноз по вопросам</th>
@@ -20,8 +20,8 @@
     <tbody>
       {% for tourresult in tourresults %}
         <tr>
+          <td><a href="/tournament/{{ tourresult.tournamentid }}"> {{ tourresult.name }}</a></td>
           <td>{{ tourresult.place }}</td>
-          <td><a href="/team/{{ tourresult.teamid }}"> {{ tourresult.teamname }}</a></td>
           <td>{{ tourresult.teamrating }}</td>
           <td>{{ tourresult.totalquestions }}</td>
           <td>{{ tourresult.predictedquestions }}</td>
