@@ -131,6 +131,9 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
     
     max_qid = 0
     bad_rates = 0
+
+    Q_WARN  = True
+
     for t in tournament_result:
         qid = 0
         if not t["team"]["id"] in team_gets:
@@ -138,7 +141,9 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
 
         if individual_questions:
             if t["mask"] == None:
-                print("WARNING: No question data: " + str(t))
+                if Q_WARN:
+                    print("WARNING: No question data")#: " + str(t))
+                    Q_WARN = False
                 continue
             for q in t["mask"]:
                 if not qid in question_gets:
@@ -256,7 +261,7 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     for t in tournaments_info_list:
         tournament_info_dict[t["id"]] = t
 
-    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2022-10-21"]
+    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2022-11-02"]
     # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2021-09-16"]
     ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
 
@@ -281,7 +286,11 @@ def process_all_data(SUB_DIR = "Output/TEST"):
 
         start = datetime.now()
         print("Process tournament "+str(t)+ " start at "+str(start))
-        data = connector.tournament_results(t, False)
+        if tournament_info_dict[t]["dateEnd"] < "2022-9-02":
+            data = connector.tournament_results(t, False)
+        else:
+            data = connector.tournament_results(t, False)
+
         print("Data get took "+str(datetime.now() - start))
 
 

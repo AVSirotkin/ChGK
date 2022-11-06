@@ -14,7 +14,7 @@
       {% for rating in ratings %}
         <tr>
           <td>{{ rating.playerid }}</td>
-          <td><a href="/player/{{ rating.playerid }}">{{ rating.full_name }}</a></td>
+          <td><a href="/player/{{ rating.playerid }}">{{ rating.fullname }}</a></td>
           <td>{{ rating.playerrating }}</td>
         </tr>
       {% endfor %}
