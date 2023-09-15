@@ -110,8 +110,134 @@ def calculate_NDCG(places, ratings, rating_is_places = True, soft_relevanse = Tr
         return math.nan
     if perfect_score == worst_score:
         return math.nan
-    return((my_score-worst_score)/(perfect_score - worst_score)) 
+    if worst_compared:
+        return((my_score-worst_score)/(perfect_score - worst_score)) 
+    else:
+        return((my_score)/(perfect_score)) 
 
+def get_player_rating(connection, playerid, releaseid):
+    rate = connection.execute('SELECT playerrating FROM playerratings WHERE playerid='+str(playerid)+' AND releaseid='+str(releaseid)).fetchone()
+    if rate is None:
+        return PLAYER_START_RATING
+    else:
+        return rate["playerrating"]
+
+
+def process_one_tournament_from_database(tournamentid, releaseid, connection, individual_questions = True, cleanup = True):
+    if cleanup:
+        connection.executescript('DELETE FROM playerratingsdelta WHERE tournamentid='+str(tournamentid))
+        connection.executescript('DELETE FROM tournamentratings WHERE tournamentid='+str(tournamentid))
+        connection.executescript('DELETE FROM questionrating WHERE tournamentid='+str(tournamentid))
+    start_time = datetime.now()
+    print(start_time)
+    question_gets = {}
+    local_teams_rates = []
+    question_values = []
+    team_ids = []
+    team_gets = {}
+    player_based_team_ratings = {}
+    team_players_id = {}
+    players_num = {}
+    total_gets = 0
+    
+    max_qid = 0
+
+    Q_WARN  = True
+
+    tournament_result = connection.execute('SELECT teamid, mask, totalquestions FROM results WHERE tournamentid='+str(tournamentid)).fetchall()
+    
+    for t in tournament_result:
+        qid = 0
+        if not t["teamid"] in team_gets:
+            team_gets[t["teamid"]] = 0
+
+        if individual_questions:
+            if t["mask"] == None:
+                if Q_WARN:
+                    print("WARNING: No question data")#: " + str(t))
+                    Q_WARN = False
+                continue
+            for q in t["mask"]:
+                if not qid in question_gets:
+                    question_gets[qid] = 0
+                if q == "1":
+                    question_gets[qid] += 1
+                    team_gets[t["team"]["id"]] += 1
+                qid += 1
+        if max_qid < qid:
+            max_qid = qid
+
+        else:
+            if not "totalquestions" in t:
+                continue
+            if t["totalquestions"] is None:
+                continue
+            team_gets[t["teamid"]] = t["totalquestions"]
+            total_gets += t["totalquestions"]
+
+        #TODO: подумать про командный рейтинг
+        # if not t["teamid"] in teams_ratings:
+        #     teams_ratings[t["teamid"]] = TEAM_START_RATING
+        
+    #roster
+    for rosterinfo in connection.execute('SELECT teamid, playerid FROM roster WHERE tournamentid='+str(tournamentid)).fetchall():
+        if not rosterinfo["teamid"] in team_players_id:
+            team_players_id[rosterinfo["teamid"]] = []
+        team_players_id[rosterinfo["teamid"]].append(rosterinfo["playerid"])
+    
+    for teamid in team_players_id:
+        pl_rates = []
+        for playerid in team_players_id[teamid]:
+            pl_rates.append(get_player_rating(connection, playerid, releaseid))
+
+        players_num[teamid] = len(pl_rates)
+        if len(pl_rates) > 6:
+            player_based_team_ratings[teamid] = independed_ELO(sorted(pl_rates)[-6:], INDEPNDENT_SKILL_QUESTION)
+        else:
+            player_based_team_ratings[teamid] = independed_ELO(pl_rates, INDEPNDENT_SKILL_QUESTION)
+
+        local_teams_rates.append(player_based_team_ratings[teamid])
+        team_ids.append(teamid)
+    
+    print("Data preparation: " + str(datetime.now() - start_time))
+    
+    if individual_questions:
+        for q in range(max_qid):
+            question_values.append(max_like(1000, local_teams_rates, question_gets[q], False))
+    else:
+        qval = max_like(1000, local_teams_rates, total_gets/question_number, False)
+        for q in range(question_number):
+            question_values.append(qval)
+
+    team_delta = {}
+    player_delta = {}
+    for tm in team_ids:
+        team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], question_values)) * DELTA_MULTIPLIER
+        w = 1.
+        if players_num[tm] > 6:
+            w = w*6 /players_num[tm]
+        for pl in team_players_id[tm]:
+            player_delta[pl] = team_delta[tm] * w
+    print("Totaly: " + str(datetime.now() - start_time))
+    return (player_based_team_ratings, question_values, player_delta)
+
+
+
+def put_tournament_into_DB(tournamentid, tournament_result, connection): 
+    roster_info = []
+    results_info = []
+
+    for t in tournament_result:
+        for pl in t["teamMembers"]:
+            roster_info.append((tournamentid, pl["player"]["id"], t["team"]["id"])) 
+        if "current" in t:
+            results_info.append((tournamentid, t["team"]["id"], t["position"], t["questionsTotal"], t["mask"], t["current"]["name"]))
+        else:
+            results_info.append((tournamentid, t["team"]["id"], t["position"], t["questionsTotal"], t["mask"], t["team"]["name"]))
+    # print(roster_info)
+    connection.cursor().executemany('INSERT INTO roster VALUES(?,?,?);',roster_info)        
+    connection.cursor().executemany('INSERT INTO results VALUES(?,?,?,?,?,?);',results_info)
+    connection.comit()           
 
 
 def process_one_tournament(teams_ratings, tournament_result, players_rating, individual_questions = True, question_number = 36): 
@@ -229,7 +355,7 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
     for tm in team_ids:
         team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], question_values)) * DELTA_MULTIPLIER
         w = 1.
-        if players_num[tm] > 16:
+        if players_num[tm] > 6:
             w = w*6 /players_num[tm]
         for pl in team_players_id[tm]:
             player_delta[pl] = team_delta[tm] * w
@@ -286,10 +412,7 @@ def process_all_data(SUB_DIR = "Output/TEST"):
 
         start = datetime.now()
         print("Process tournament "+str(t)+ " start at "+str(start))
-        if tournament_info_dict[t]["dateEnd"] < "2022-9-02":
-            data = connector.tournament_results(t, False)
-        else:
-            data = connector.tournament_results(t, False)
+        data = connector.tournament_results(t, False)
 
         print("Data get took "+str(datetime.now() - start))
 
