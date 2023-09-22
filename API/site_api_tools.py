@@ -62,11 +62,16 @@ class ChGK_API_connector:
                 return(t["teamMembers"])
         return []
     
-    def get_all_rated_tournaments(self):
-        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page=1&itemsPerPage=1000&properties.maiiRating=true", headers={'accept': 'application/json'})
-#        Tournaments_list = []
-        infoA = r.json()
-        return infoA
+    def get_all_rated_tournaments(self, page = 1):
+        res = []
+        next = True
+        while next:
+            r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page)+"&itemsPerPage=500&properties.maiiRating=true", headers={'accept': 'application/json'})
+            infoA = r.json()
+            res += infoA
+            page += 1
+            next = (len(infoA)==500)
+        return res
  
 
     def tournament_results(self, idtournament, forced = False):
