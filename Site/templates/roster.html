@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <table id="Roster" class="table table-striped">
+    <thead>
+      <tr>
+        <th rowspan="2">Id</th>
+        <th rowspan="2">Игрок</th>
+        <th rowspan="2">Рейтинг</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for player in roster %}
+        <tr>
+          <td>{{ player.playerid }}</td>
+          <td>{{ player.fullname }}</td>
+          <td>{{ player.playerrating }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+{% endblock %}

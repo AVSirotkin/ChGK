@@ -17,17 +17,25 @@
         <th>Не больше</th>
       </tr>
     </thead>
+    <script type='text/javascript'> function my_open(teamid, tournamentid) {window.open("/teams/"+teamid+"/"+tournamentid)}</script> 
+    <script type='text/javascript'> function my_show(teamid, tournamentid) {fetch("/teams/"+teamid+"/"+tournamentid /*, options */)
+      .then((response) => response.text())
+      .then((html) => {
+          document.getElementById("roster"+tournamentid).innerHTML = html;
+      })
+      }</script> 
+
     <tbody>
       {% for tourresult in tourresults %}
         <tr>
-          <td><a href="/tournament/{{ tourresult.tournamentid }}"> {{ tourresult.name }}</a></td>
+          <td><a href="/tournament/{{ tourresult.tournamentid }}"> {{ tourresult.name }}</a><div id="roster{{tourresult.tournamentid}}", onclick="my_show({{teamid}}, {{tourresult.tournamentid}})">(состав)</div></td>
           <td>{{ tourresult.place }}</td>
-          <td>{{ tourresult.teamrating }}</td>
+          <td>{{ "%.2f"|format(tourresult.teamrating) }} </td>
           <td>{{ tourresult.totalquestions }}</td>
-          <td>{{ tourresult.predictedquestions }}</td>
-          <td>{{ tourresult.totalquestions - tourresult.predictedquestions }}</td>
-          <td>{{ tourresult.atleastprob }}</td>
-          <td>{{ tourresult.atmostprob }}</td>
+          <td>{{ "%.2f"|format(tourresult.predictedquestions) }}</td>
+          <td>{{ "%.2f"|format(tourresult.totalquestions - tourresult.predictedquestions) }}</td>
+          <td>{{ "%.2f"|format(tourresult.atleastprob*100)}}%</td>
+          <td>{{ "%.2f"|format(tourresult.atmostprob*100)}}%</td>
         </tr>
       {% endfor %}
     </tbody>

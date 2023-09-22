@@ -66,9 +66,55 @@ def showTournamentInfo(tournamentid):
     print(tournaments[0].keys())
     print(tournaments[0]['teamid'])
     conn.close()
-    return render_template("tournament.html", tourresults=tournaments)
+    return render_template("tournament.html", tourresults=tournaments, tournamentid = tournamentid)
+
+
+@app.route("/tournament_full/<int:tournamentid>", subdomain="rating")
+def showFullTournamentInfo(tournamentid):
+    conn = get_db_connection()
+    tournaments = conn.execute('SELECT * FROM results '+
+    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
+    ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
+    # ' ORDER BY place'
+    ).fetchall()
+    # print(tuple(tournaments[0]))
+    print(tournaments[0].keys())
+    print(tournaments[0]['teamid'])
+    conn.close()
+    return render_template("tournament_full.html", tourresults=tournaments)
     
-@app.route("/team/<int:teamid>", subdomain="rating")
+
+
+
+
+@app.route("/teams/<int:teamid>/<int:tournamentid>", subdomain="rating")
+def showTeamTournamentInfo(teamid, tournamentid):
+    conn = get_db_connection()
+    relise_info = conn.execute('SELECT * FROM playerratingsdelta '+
+                               'WHERE playerratingsdelta.tournamentid = ' +str(tournamentid)).fetchone()
+    release_id = relise_info["releaseid"] - 1
+    
+    # print(relise_info["releaseid"])
+
+    roster = conn.execute('SELECT * FROM roster '+
+    'JOIN playerratings ON roster.playerid=playerratings.playerid' + 
+    " JOIN players ON roster.playerid=players.playerid"
+    ' WHERE roster.teamid = ' + str(teamid) +
+    ' AND roster.tournamentid = ' + str(tournamentid) + 
+    ' AND playerratings.releaseid = ' + str(release_id) + 
+    ' ORDER BY playerratings.playerrating DESC'
+    ).fetchall()
+    # print(tuple(tournaments[0]))
+    # print(tournaments[0].keys())
+    # print(tournaments[0]['teamid'])
+    conn.close()
+    text = '<br>'.join([str(round(t["playerrating"]))+" "+t["fullname"] for t in roster])
+    return text
+    # return render_template("roster.html", roster=roster)
+
+
+
+@app.route("/teams/<int:teamid>", subdomain="rating")
 def showTeamInfo(teamid):
     conn = get_db_connection()
     tournaments = conn.execute('SELECT * FROM results '+
@@ -81,7 +127,7 @@ def showTeamInfo(teamid):
     # print(tournaments[0].keys())
     # print(tournaments[0]['teamid'])
     conn.close()
-    return render_template("team.html", tourresults=tournaments)
+    return render_template("team.html", tourresults=tournaments, teamid = teamid)
 
 @app.route("/tournaments", subdomain="rating")
 def showAllTournaments():
@@ -108,4 +154,4 @@ if __name__ == "__main__":
     website_url = read_cfg()
     print(website_url)
     app.config['SERVER_NAME'] = website_url
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=80)
