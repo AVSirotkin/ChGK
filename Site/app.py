@@ -108,7 +108,8 @@ def showTeamTournamentInfo(teamid, tournamentid):
     # print(tournaments[0].keys())
     # print(tournaments[0]['teamid'])
     conn.close()
-    text = '<br>'.join([str(round(t["playerrating"]))+" "+t["fullname"] for t in roster])
+    # text = '<br>'.join([str(round(t["playerrating"]))+" "+t["fullname"] for t in roster])
+    text = '<br>'.join([str(round(t["playerrating"]))+' <a href="/player/'+str(t["playerid"])+'"> '+t["fullname"] +"</a>" for t in roster])
     return text
     # return render_template("roster.html", roster=roster)
 
