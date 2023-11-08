@@ -57,16 +57,22 @@ def showPlayerInfo(playerid):
 @app.route("/tournament/<int:tournamentid>", subdomain="rating")
 def showTournamentInfo(tournamentid):
     conn = get_db_connection()
+
+    tournament_info = conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(tournamentid)).fetchone() 
+
     tournaments = conn.execute('SELECT * FROM results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
     # ' ORDER BY place'
     ).fetchall()
     # print(tuple(tournaments[0]))
-    print(tournaments[0].keys())
-    print(tournaments[0]['teamid'])
+    # print(tournaments[0].keys())
+    # print(tournaments[0]['teamid'])
     conn.close()
-    return render_template("tournament.html", tourresults=tournaments, tournamentid = tournamentid)
+    if tournament_info: 
+        return render_template("tournament.html", tourresults=tournaments, tournamentid = tournamentid, tournament_info = tournament_info)
+    else:
+        return "Данных о турнире "+str(tournamentid)+" не найдено"
 
 
 @app.route("/tournament_full/<int:tournamentid>", subdomain="rating")
@@ -82,9 +88,24 @@ def showFullTournamentInfo(tournamentid):
     print(tournaments[0]['teamid'])
     conn.close()
     return render_template("tournament_full.html", tourresults=tournaments)
-    
 
 
+@app.route("/legs_info/<int:tournamentid>/<int:teamid>", subdomain="rating")
+def showLegInfo(tournamentid, teamid):
+    field = request.args.get('field', default = "questions", type = str)
+    if field in ["legsize", "mask", "legquestions", "predictedquestions", "atleastprob", "atmostprob"]:
+        conn = get_db_connection()
+        leg_info = conn.execute('SELECT '+field+' FROM tournaments_legs '+
+                               'WHERE tournaments_legs.tournamentid = ' +str(tournamentid) + " AND tournaments_legs.teamid = " +str(teamid)+
+                               ' ORDER BY leg').fetchall()
+        conn.close()
+        if field in ["atleastprob", "atmostprob"]:
+            text = ' '.join([str(round(t[field]*100, 2))+"%" for t in leg_info])
+        else:
+            text = ' '.join([str(round(t[field], 2)) for t in leg_info])
+    else:
+        return("")
+    return(text)
 
 
 @app.route("/teams/<int:teamid>/<int:tournamentid>", subdomain="rating")
@@ -112,6 +133,7 @@ def showTeamTournamentInfo(teamid, tournamentid):
     text = '<br>'.join([str(round(t["playerrating"]))+' <a href="/player/'+str(t["playerid"])+'"> '+t["fullname"] +"</a>" for t in roster])
     return text
     # return render_template("roster.html", roster=roster)
+
 
 
 
