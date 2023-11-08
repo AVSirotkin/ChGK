@@ -386,8 +386,8 @@ def process_all_data(SUB_DIR = "Output/TEST"):
 
     connector.load_cache("cache.json")
 
-    # with open('tournaments.json', 'r', encoding="utf8") as JSON:
-    #     tournaments_info_list = json.load(JSON)
+    with open('tournaments.json', 'r', encoding="utf8") as JSON:
+        tournaments_info_list = json.load(JSON)
 
     tournaments_info_list = connector.get_all_rated_tournaments()
 
@@ -398,7 +398,7 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     for t in tournaments_info_list:
         tournament_info_dict[t["id"]] = t
 
-    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2023-09-25"]
+    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2023-11-06"]
     # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2021-09-16"]
     ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
 
@@ -492,9 +492,11 @@ def process_all_data(SUB_DIR = "Output/TEST"):
         
         
         if save_data:
+            qvalues = [(t, i+1, qvl) for (i,qvl) in enumerate(qv)]
             tournamentrating_data = []
             results_data = []
             roster_data = []
+            legs_data = []
             team_places = sorted([x for x in delta], key = lambda x: -delta[x])
             for my_t in data:
                 if (not (my_t["mask"] == None)) |  (not (my_t["questionsTotal"] == None)):
@@ -504,12 +506,25 @@ def process_all_data(SUB_DIR = "Output/TEST"):
                         results_data.append((t, my_t["team"]["id"], my_t["position"], my_t["questionsTotal"], my_t["mask"], my_t["current"]["name"]))
                         for pld in my_t["teamMembers"]:
                             roster_data.append((t, pld["player"]["id"], my_t["team"]["id"]))
-                        
-                        # bytes = f.write(my_t["current"]["name"] + "; " +str(delta[my_t["team"]["id"]])+ "; " +str(len(my_t["teamMembers"])) +"; "+ str(my_t["position"]) + "; " + str(team_places.index(my_t["team"]["id"])+1)+"; " + str(my_t["questionsTotal"]) + "; " + str(ELO_estimate(delta[my_t["team"]["id"]], qv))+"\n")
+
+
+                    q_last = 0
+                    if (not my_t["mask"] is None) and (my_t["team"]["id"] in delta):
+                        for qqt in sorted(tournament_info_dict[t]["questionQty"], key=lambda x: int(x)):
+                            leg_N = tournament_info_dict[t]["questionQty"][qqt]
+                            q_cur = q_last + leg_N+6
+                            leg_Total = sum([x=="1" for x in  my_t["mask"][q_last:q_cur]])
+                            atmost, atleast = estimate_p_values(delta[my_t["team"]["id"]], qv[q_last:q_cur], leg_Total)
+
+                            legs_data.append((t, my_t["team"]["id"], int(qqt), leg_N, my_t["mask"][q_last:q_cur],leg_Total, ELO_estimate(delta[my_t["team"]["id"]], qv[q_last:q_cur]), atleast, atmost))
+                            q_last = q_cur
+                            # bytes = f.write(my_t["current"]["name"] + "; " +str(delta[my_t["team"]["id"]])+ "; " +str(len(my_t["teamMembers"])) +"; "+ str(my_t["position"]) + "; " + str(team_places.index(my_t["team"]["id"])+1)+"; " + str(my_t["questionsTotal"]) + "; " + str(ELO_estimate(delta[my_t["team"]["id"]], qv))+"\n")
             
+        cursor.executemany('INSERT INTO questionrating VALUES(?,?,?);',qvalues)            
         cursor.executemany('INSERT INTO roster VALUES(?,?,?);',roster_data)        
         cursor.executemany('INSERT INTO tournamentratings VALUES(?,?,?,?,?,?);',tournamentrating_data)    
         cursor.executemany('INSERT INTO results VALUES(?,?,?,?,?,?);',results_data)        
+        cursor.executemany('INSERT INTO tournaments_legs VALUES(?,?,?,?,?,?,?,?,?);',legs_data)        
         
         cursor.execute("INSERT INTO tournaments VALUES(?,?,?,?);", (tournament_info_dict[t]["id"],tournament_info_dict[t]["name"], tournament_info_dict[t]["dateStart"],tournament_info_dict[t]["dateEnd"]))
 
@@ -595,8 +610,9 @@ def clear_db():
         CREATE TABLE tournamentratings ( tournamentid integer, teamid integer, teamrating real, predictedquestions real, atleastprob real, atmostprob real);
         CREATE TABLE players ( playerid integer primary key, name varchar(255), surname varchar(255), patronim varchar(255), fullname varchar(255));
         CREATE TABLE questionrating ( tournamentid int, questionid int, hardnes real);
-        CREATE TABLE teams ( teamid integer primary key, teamname varchar(255)); 
-        ''')
+        CREATE TABLE teams ( teamid integer primary key, teamname varchar(255));
+        CREATE TABLE tournaments_legs (tournamentid integer, teamid integer, leg integer, legsize integer, mask varchar(255), legquestions integer, predictedquestions real, atleastprob real, atmostprob real); 
+''')
         conn.close()  
     except Exception:
         print("DB exists?")
@@ -611,6 +627,7 @@ def clear_db():
         cursor.execute('DELETE FROM players;')
         cursor.execute('DELETE FROM questionrating;')
         cursor.execute('DELETE FROM teams;')
+        cursor.execute('DELETE FROM tournaments_legs;')
         conn.commit()
         conn.close()   
 
