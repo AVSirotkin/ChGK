@@ -26,8 +26,12 @@ ELO_NORM = 400
 
 
 def ELO(R, Q, base = ELO_BASE, norm = ELO_NORM):
-    return 1/(1+math.pow(base, (Q-R)/norm))
-
+    try:
+        return 1/(1+math.pow(base, (Q-R)/norm))
+    except ArithmeticError:
+        print("got erroror: ", R, Q, base, norm)
+        raise("ssss")
+    
 def independed_ELO(R_list, Q, base = ELO_BASE, norm = ELO_NORM):
     p = 1
     for R in R_list:
@@ -41,6 +45,7 @@ def ELO_estimate(R, rates, base = ELO_BASE, norm = ELO_NORM):
 def estimate_p_values(R, rates, N, base = ELO_BASE, norm = ELO_NORM):
     p = [0.0]*(len(rates)+2)
     p[0] = 1
+
     for i in range(len(rates)):
         pq = ELO(R, rates[i], base, norm)
         for j in range(i+2):
@@ -81,6 +86,12 @@ def max_like(R, rates, gets, is_team = True, max_steps = 10000, eps = 0.00001, b
                 step /= 2
             prev_increase = True
             R += step
+        if R > MAX_QUESTION_RATING:
+            R = MAX_QUESTION_RATING
+            break
+        if R < MIN_QUESTION_RATING:
+            R = MIN_QUESTION_RATING
+            break
 #    print("max_like: " + str(datetime.now() - start_time)+"   " + str(max_steps) + " " + str(step))
     return (R)
 
@@ -384,21 +395,23 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     cursor = DBconn.cursor()
     # DBconn.executescript("DELETE FROM playerratings")
 
+    # connector.load_cache("cache_large.json")
+    
     connector.load_cache("cache.json")
 
-    with open('tournaments.json', 'r', encoding="utf8") as JSON:
-        tournaments_info_list = json.load(JSON)
+    # with open('all_rated_tours_2013.json', 'r', encoding="utf8") as JSON:
+    #     tournaments_info_list = json.load(JSON)
 
     tournaments_info_list = connector.get_all_rated_tournaments()
 
-    with open("tournaments.json", "w") as file:
-        json.dump(tournaments_info_list, file)
+    # with open("tournaments.json", "w") as file:
+    #     json.dump(tournaments_info_list, file)
 
     tournament_info_dict = {}
     for t in tournaments_info_list:
         tournament_info_dict[t["id"]] = t
 
-    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2023-11-06"]
+    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2024-01-16"]
     # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2021-09-16"]
     ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
 
@@ -407,6 +420,7 @@ def process_all_data(SUB_DIR = "Output/TEST"):
 
     cnt = 0
 
+    # release_date = datetime(year = 2013, month = 9, day = 5) 
     release_date = datetime(year = 2021, month = 9, day = 2) 
     release_num = 0
     tournaments_by_reliases = [[]]
@@ -492,6 +506,8 @@ def process_all_data(SUB_DIR = "Output/TEST"):
         
         
         if save_data:
+            q_diff = []
+            q2_diff = []
             qvalues = [(t, i+1, qvl) for (i,qvl) in enumerate(qv)]
             tournamentrating_data = []
             results_data = []
@@ -506,13 +522,13 @@ def process_all_data(SUB_DIR = "Output/TEST"):
                         results_data.append((t, my_t["team"]["id"], my_t["position"], my_t["questionsTotal"], my_t["mask"], my_t["current"]["name"]))
                         for pld in my_t["teamMembers"]:
                             roster_data.append((t, pld["player"]["id"], my_t["team"]["id"]))
-
-
+                        q_diff.append(abs(my_t["questionsTotal"] - ELO_estimate(delta[my_t["team"]["id"]], qv)))
+                        q2_diff.append((my_t["questionsTotal"] - ELO_estimate(delta[my_t["team"]["id"]], qv))**2)
                     q_last = 0
                     if (not my_t["mask"] is None) and (my_t["team"]["id"] in delta):
                         for qqt in sorted(tournament_info_dict[t]["questionQty"], key=lambda x: int(x)):
                             leg_N = tournament_info_dict[t]["questionQty"][qqt]
-                            q_cur = q_last + leg_N+6
+                            q_cur = q_last + leg_N
                             leg_Total = sum([x=="1" for x in  my_t["mask"][q_last:q_cur]])
                             atmost, atleast = estimate_p_values(delta[my_t["team"]["id"]], qv[q_last:q_cur], leg_Total)
 
@@ -533,6 +549,15 @@ def process_all_data(SUB_DIR = "Output/TEST"):
         results[t]["delta_players"] = delta_pl
         results[t]["team_rates"] = delta
         results[t]["score"] = score
+        results[t]["SSE"] = sum(q2_diff)
+        results[t]["SAE"] = sum(q_diff)
+
+        if len(q_diff) >0:
+            results[t]["MSE"] = sum(q2_diff)/len(q2_diff)
+            results[t]["MAE"] = sum(q_diff)/len(q_diff)
+        else:
+            results[t]["MSE"] = 0
+            results[t]["MAE"] = 0
         
         tournaments_by_reliases[-1].append(t)
     #    for pl in delta_pl:
@@ -559,7 +584,11 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     DBconn.commit()
     DBconn.close()
 
+    print("Save chach. Be patient")
+    
     connector.save_cache("cache.json")
+    # connector.save_cache("cache_large.json")
+    # print("Done")
     ## Models comparison
 
     WB = 0
@@ -587,7 +616,10 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     print(WB, WC, D)
     print(NWB, NWC, ND)
 
-
+    # trnm_list = [9207, 9693, 9737, 9423,  9543, 9582, 9205, 9493, 9147, 9626]
+    # for trnm in trnm_list:
+    #     print(trnm, results[trnm]["SAE"], results[trnm]["SSE"])
+    # print("Total:", sum([results[trnm]["SAE"] for trnm in trnm_list]), sum([results[trnm]["SSE"] for trnm in trnm_list]))
     # with open(SUB_DIR+"/results.json", "w") as file:
     #     json.dump(results, file)
 
