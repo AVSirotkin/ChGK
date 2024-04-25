@@ -47,6 +47,7 @@
         <th rowspan="2">Место</th>
         <th rowspan="2">Команда</th>
         <th rowspan="2">Сила команды</th>
+        <th rowspan="2">Показанная сила</th>
         <th rowspan="2">Взято вопросов</th>
         <th rowspan="2">Прогноз по вопросам</th>
         <th rowspan="2">Дельта</th>
@@ -63,6 +64,7 @@
           <td>{{ tourresult.place }}</td>
           <td><a href="/teams/{{ tourresult.teamid }}"> {{ tourresult.teamname }}</a><div id="roster{{tourresult.teamid}}"> <div onclick="my_show({{tourresult.teamid}}, {{tournamentid}})">(состав)</div></div></td>
           <td>{{ "%.2f"|format(tourresult.teamrating) }}</a></td>
+          <td>{{ "%.2f"|format(tourresult.teamperformance) }}</a></td>
           <td>{{ tourresult.totalquestions }}<div id="legquestions{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td>
           <td>{{ "%.2f"|format(tourresult.predictedquestions) }} <div id="predictedquestions{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td>
           <td>{{ "%.2f"|format(tourresult.totalquestions - tourresult.predictedquestions) }}</td>
