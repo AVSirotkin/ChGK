@@ -3,6 +3,11 @@
 {% block content %}
 <script src='https://cdn.plot.ly/plotly-2.31.1.min.js'></script>
 
+<h2>Страничка сравнения команд собравшихся на Нехрустальную сову</h2>
+
+<p>Выберите 2 команды из списка участников и ожидаемую сложность вопросов и смотрите на прогноз</p>
+
+
 
 <select type="text" id="team1" list="players_list" placeholder="команда 1" onchange="UpdateAll()"> </select> <select type="text" id="team2" list="players_list" placeholder="команда 2" onchange="UpdateAll()"></select>  
 <datalist id="players_list">
@@ -96,6 +101,6 @@
         Plotly.newPlot('graph', data, layout);
 
     }
-
+    UpdateAll()
 </script>
 {% endblock %}
