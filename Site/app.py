@@ -171,6 +171,7 @@ def showTeamTournamentInfo(teamid, tournamentid):
 
 
 
+@app.route("/sova2024", subdomain="rating")
 @app.route("/compare", subdomain="rating")
 def showCompare():
     return render_template("compare.html")
