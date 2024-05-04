@@ -175,6 +175,11 @@ def showTeamTournamentInfo(teamid, tournamentid):
 def showStudChR():
     return render_template("studchr24.html")
 
+@app.route("/fantasy/schr", subdomain="rating")
+def showStudChRFant():
+    return render_template("studchr24fantasy.html")
+
+
 
 @app.route("/predict/nesova2024", subdomain="rating")
 @app.route("/nesova2024", subdomain="rating")
