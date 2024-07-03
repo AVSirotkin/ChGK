@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script type='text/javascript'> function my_show(teamid, tournamentid) {fetch("/teams/"+teamid+"/"+tournamentid /*, options */)
+    .then((response) => response.text())
+    .then((html) => {
+        document.getElementById("roster"+teamid).innerHTML = html;
+    })
+    }
+</script>
+
+<h2>Места c {{(page-1)*100 + 1}} по {{page*100}}</h2>
+  {% if page > 1: %}
+  <a href="teams?page={{page-1}}">Предыдущие</a>   
+  {% endif %}
+
+
+  <a href="teams?page={{page+1}}">Следующие</a>   
+  
+  
+
+  <table id="ratings" class="table table-striped">
+    <thead>
+      <tr>
+        <th>Место</th>
+        <th>ID</th>
+        <th>Название</th>
+        <th>Рейтинг</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rating in ratings %}
+        <tr>
+          <td>{{ rating.position }}</td>
+          <td>{{ rating.teamid }}</td>
+          <td><a href="/teams/{{ rating.teamid }}">{{ rating.name }}</a> <div id="roster{{rating.teamid}}"> <div onclick="my_show({{rating.teamid}}, 0)">(состав)</div></div></td>
+          <td>{{ "%.2f"|format(rating.teamrating) }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+{% endblock %}

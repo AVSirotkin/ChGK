@@ -48,6 +48,30 @@ def showAllPlayers(season = 0):
     return render_template("allplayers.html", ratings=ratings, page = page)
 
 
+@app.route('/teams', subdomain="rating")
+def showAllTeams(season = 0):
+    page = request.args.get('page', 1, type=int)
+    ts = time.time()
+    conn = get_db_connection()
+    # if season == 0:
+    #     tmp = conn.execute('SELECT MAX(releaseid) as releaseid FROM playerratings').fetchall()
+        # season = int(tmp[0]["releaseid"])
+    t1 = time.time()
+    print(page, t1-ts)
+    ratings = conn.execute('SELECT ROW_NUMBER() OVER(ORDER BY base_team_rates.team_rating  DESC) AS position, teams.teamid as teamid, teams.teamname as name, base_team_rates.team_rating as teamrating FROM base_team_rates JOIN teams ON base_team_rates.teamid=teams.teamid ORDER BY base_team_rates.team_rating DESC LIMIT 100 OFFSET '+str(100*(page-1))).fetchall()
+    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
+    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, pr.playerrating as playerrating, pr.releaseid as releaseid FROM (SELECT * FROM playerratings WHERE releaseid='+str(season)+' ORDER BY playerrating DESC LIMIT 500) as pr JOIN players ON pr.playerid=players.playerid ORDER BY pr.playerrating DESC LIMIT 500').fetchall()
+    #players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid
+    # ratings["position"] = [x+1+(page-1)*500 for x in range(len(ratings))]
+    t2= time.time()
+    print(t2 - t1, len(ratings))
+    conn.close()
+    return render_template("allteams.html", ratings=ratings, page = page)
+
+
+
+
+
 @app.route("/player/<int:playerid>", subdomain="rating")
 def showPlayerInfo(playerid):
     conn = get_db_connection()
@@ -119,44 +143,57 @@ def showLegInfo(tournamentid, teamid):
 def showTeamTournamentInfo(teamid, tournamentid):
     ts = time.time()
     conn = get_db_connection()
-    relise_info = conn.execute('SELECT * FROM playerratingsdelta '+
-                               'WHERE playerratingsdelta.tournamentid = ' +str(tournamentid)).fetchone()
-    release_id = relise_info["releaseid"] - 1
+    if tournamentid == 0:
+        relise_info = conn.execute('SELECT MAX(releaseid) as releaseid FROM playerratingsdelta').fetchone()
+        release_id = relise_info["releaseid"]
+    else:
+        relise_info = conn.execute('SELECT * FROM playerratingsdelta '+
+                                'WHERE playerratingsdelta.tournamentid = ' +str(tournamentid)).fetchone()
+        release_id = relise_info["releaseid"] - 1
    
-    # print([dict(x) for x in conn.execute('EXPLAIN QUERY PLAN SELECT * FROM roster '+
+    # # print([dict(x) for x in conn.execute('EXPLAIN QUERY PLAN SELECT * FROM roster '+
+    # # 'JOIN playerratings ON roster.playerid=playerratings.playerid' + 
+    # # " JOIN players ON roster.playerid=players.playerid"
+    # # ' WHERE roster.teamid = ' + str(teamid) +
+    # # ' AND roster.tournamentid = ' + str(tournamentid) + 
+    # # ' AND playerratings.releaseid = ' + str(release_id) #+ 
+    # # # ' ORDER BY playerratings.playerrating DESC'
+    # # ).fetchall()])
+   
+    
+    # ts1 = time.time()
+    
+  
+    # roster = conn.execute('SELECT * FROM roster '+
     # 'JOIN playerratings ON roster.playerid=playerratings.playerid' + 
-    # " JOIN players ON roster.playerid=players.playerid"
+    # #" JOIN players ON roster.playerid=players.playerid"
     # ' WHERE roster.teamid = ' + str(teamid) +
     # ' AND roster.tournamentid = ' + str(tournamentid) + 
-    # ' AND playerratings.releaseid = ' + str(release_id) #+ 
-    # # ' ORDER BY playerratings.playerrating DESC'
-    # ).fetchall()])
-   
-    
-    ts1 = time.time()
-    
+    # ' AND playerratings.releaseid = ' + str(release_id) + 
+    # ' ORDER BY playerratings.playerrating DESC'
+    # ).fetchall()
+    # # print(tuple(tournaments[0]))
+    # # print(tournaments[0].keys())
+    # # print(tournaments[0]['teamid'])
   
-    roster = conn.execute('SELECT * FROM roster '+
-    'JOIN playerratings ON roster.playerid=playerratings.playerid' + 
-    #" JOIN players ON roster.playerid=players.playerid"
-    ' WHERE roster.teamid = ' + str(teamid) +
-    ' AND roster.tournamentid = ' + str(tournamentid) + 
-    ' AND playerratings.releaseid = ' + str(release_id) + 
-    ' ORDER BY playerratings.playerrating DESC'
-    ).fetchall()
-    # print(tuple(tournaments[0]))
-    # print(tournaments[0].keys())
-    # print(tournaments[0]['teamid'])
-  
-    ts3 = time.time()
-   
-    roster = conn.execute('SELECT * FROM roster '+
-    'JOIN playerratings ON roster.playerid=playerratings.playerid' +
-    ' AND roster.teamid = ' + str(teamid) +
-    ' AND roster.tournamentid = ' + str(tournamentid) +
-    ' AND playerratings.releaseid = ' + str(release_id) + 
-    " JOIN players ON roster.playerid=players.playerid"
-    ).fetchall()
+    # ts3 = time.time()
+    if tournamentid == 0:
+        roster = conn.execute('SELECT * FROM base_roster '+
+        'JOIN playerratings ON base_roster.player_id=playerratings.playerid' +
+        ' AND base_roster.teamid = ' + str(teamid) +
+        ' AND playerratings.releaseid = ' + str(release_id) + 
+        " JOIN players ON base_roster.player_id=players.playerid" +
+        ' ORDER BY playerratings.playerrating DESC'
+        ).fetchall()
+    else:   
+        roster = conn.execute('SELECT * FROM roster '+
+        'JOIN playerratings ON roster.playerid=playerratings.playerid' +
+        ' AND roster.teamid = ' + str(teamid) +
+        ' AND roster.tournamentid = ' + str(tournamentid) +
+        ' AND playerratings.releaseid = ' + str(release_id) + 
+        " JOIN players ON roster.playerid=players.playerid" +
+        ' ORDER BY playerratings.playerrating DESC'
+        ).fetchall()
  
   
   
@@ -165,7 +202,7 @@ def showTeamTournamentInfo(teamid, tournamentid):
     ts2 = time.time()
     # text = '<br>'.join([str(round(t["playerrating"]))+" "+t["fullname"] for t in roster])
     text = '<br>'.join([str(round(t["playerrating"]))+' <a href="/player/'+str(t["playerid"])+'"> '+t["fullname"] +"</a>" for t in roster])
-    print("times",ts2-ts3, ts3-ts1, ts2-ts, ts1 - ts)
+    # print("times",ts2-ts3, ts3-ts1, ts2-ts, ts1 - ts)
     return text
     # return render_template("roster.html", roster=roster)
 
