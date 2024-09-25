@@ -60,7 +60,7 @@
     </thead>
     <tbody>
       {% for tourresult in tourresults %}
-        <tr>
+        <tr id="{{tourresult.teamid}}">
           <td>{{ tourresult.place }}</td>
           <td><a href="/teams/{{ tourresult.teamid }}"> {{ tourresult.teamname }}</a><div id="roster{{tourresult.teamid}}"> <div onclick="my_show({{tourresult.teamid}}, {{tournamentid}})">(состав)</div></div></td>
           <td>{{ "%.2f"|format(tourresult.teamrating) }}</a></td>

@@ -8,6 +8,7 @@
       <tr>
         <th>Релиз</th>
         <th>Турнир</th>
+        <th>Команда</th>
         <th>Дельта</th>
       </tr>
     </thead>
@@ -16,7 +17,8 @@
         <tr>
             <td>{{ delta.releaseid }}</td>
             <td><a href="/tournament/{{ delta.tournamentid }}">{{ delta.name }}</a></td>
-            <td>{{ delta.deltarating }}</td>
+            <td><a href="/teams/{{ delta.teamid }}">{{ delta.teamname }}</a></td>
+            <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ delta.deltarating }}</a></td>
         </tr>
       {% endfor %}
     </tbody>

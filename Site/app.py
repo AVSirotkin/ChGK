@@ -75,11 +75,17 @@ def showAllTeams(season = 0):
 @app.route("/player/<int:playerid>", subdomain="rating")
 def showPlayerInfo(playerid):
     conn = get_db_connection()
-    deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    ts = time.time()
+    # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid AND playerratingsdelta.playerid = '+str(playerid)+' JOIN roster ON playerratingsdelta.tournamentid=roster.tournamentid AND roster.playerid = '+str(playerid)+' JOIN results ON playerratingsdelta.tournamentid=results.tournamentid AND roster.teamid=results.teamid ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    ts1 = time.time()
     # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid JOIN roster ON tournaments.tournamentid=roster.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
     ratings = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
+    # ratings = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)).fetchall()
+    ts2 = time.time()
     playername = conn.execute('SELECT fullname from players WHERE playerid='+str(playerid)).fetchone()["fullname"]
     conn.close()
+    print("deltas", ts1 - ts, "ratings", ts2-ts1)
     return render_template("player.html", ratings=ratings, deltas=deltas, playerid=playerid, playername=playername)
 
 @app.route("/tournament/<int:tournamentid>", subdomain="rating")
@@ -151,32 +157,6 @@ def showTeamTournamentInfo(teamid, tournamentid):
                                 'WHERE playerratingsdelta.tournamentid = ' +str(tournamentid)).fetchone()
         release_id = relise_info["releaseid"] - 1
    
-    # # print([dict(x) for x in conn.execute('EXPLAIN QUERY PLAN SELECT * FROM roster '+
-    # # 'JOIN playerratings ON roster.playerid=playerratings.playerid' + 
-    # # " JOIN players ON roster.playerid=players.playerid"
-    # # ' WHERE roster.teamid = ' + str(teamid) +
-    # # ' AND roster.tournamentid = ' + str(tournamentid) + 
-    # # ' AND playerratings.releaseid = ' + str(release_id) #+ 
-    # # # ' ORDER BY playerratings.playerrating DESC'
-    # # ).fetchall()])
-   
-    
-    # ts1 = time.time()
-    
-  
-    # roster = conn.execute('SELECT * FROM roster '+
-    # 'JOIN playerratings ON roster.playerid=playerratings.playerid' + 
-    # #" JOIN players ON roster.playerid=players.playerid"
-    # ' WHERE roster.teamid = ' + str(teamid) +
-    # ' AND roster.tournamentid = ' + str(tournamentid) + 
-    # ' AND playerratings.releaseid = ' + str(release_id) + 
-    # ' ORDER BY playerratings.playerrating DESC'
-    # ).fetchall()
-    # # print(tuple(tournaments[0]))
-    # # print(tournaments[0].keys())
-    # # print(tournaments[0]['teamid'])
-  
-    # ts3 = time.time()
     if tournamentid == 0:
         roster = conn.execute('SELECT * FROM base_roster '+
         'JOIN playerratings ON base_roster.player_id=playerratings.playerid' +
@@ -194,8 +174,6 @@ def showTeamTournamentInfo(teamid, tournamentid):
         " JOIN players ON roster.playerid=players.playerid" +
         ' ORDER BY playerratings.playerrating DESC'
         ).fetchall()
- 
-  
   
   
     conn.close()
@@ -216,6 +194,16 @@ def showStudChR():
 def showStudChRFant():
     return render_template("studchr24fantasy.html")
 
+@app.route("/predict/nevermore2024", subdomain="rating")
+@app.route("/nevermore2024", subdomain="rating")
+@app.route("/nevermore", subdomain="rating")
+def showNevermore():
+    return render_template("nevermore24.html")
+
+
+@app.route("/nevermore_v2", subdomain="rating")
+def showNevermore2():
+    return render_template("nevermore2405.html")
 
 
 @app.route("/predict/nesova2024", subdomain="rating")
