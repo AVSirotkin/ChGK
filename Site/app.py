@@ -98,8 +98,8 @@ def showTournamentInfo(tournamentid):
 
     tournaments = conn.execute('SELECT * FROM results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
-    ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
-    # ' ORDER BY place'
+    ' WHERE results.tournamentid = '+str(tournamentid) + #+
+    ' ORDER BY totalquestions DESC;'
     ).fetchall()
     # print(tuple(tournaments[0]))
     # print(tournaments[0].keys())
@@ -155,7 +155,10 @@ def showTeamTournamentInfo(teamid, tournamentid):
     else:
         relise_info = conn.execute('SELECT * FROM playerratingsdelta '+
                                 'WHERE playerratingsdelta.tournamentid = ' +str(tournamentid)).fetchone()
-        release_id = relise_info["releaseid"] - 1
+        if not relise_info is None:
+            release_id = relise_info["releaseid"] - 1
+        else: 
+            release_id = 159 #temporel nevermore fix
    
     if tournamentid == 0:
         roster = conn.execute('SELECT * FROM base_roster '+
