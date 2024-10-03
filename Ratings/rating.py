@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import json
 import math
 import sys
+from tqdm import tqdm
+
 
 sys.path.append('..')
 sys.path.append('.')
@@ -17,11 +19,13 @@ import sqlite3
 MIN_QUESTION_RATING = 0
 MAX_QUESTION_RATING = 10000
 DELTA_MULTIPLIER = 10
+NON_RATE_DELTA_MULTIPLIER = 0.1
 INDEPNDENT_SKILL_QUESTION = 2000
 PLAYER_START_RATING = 1000
 TEAM_START_RATING = 1000
 ELO_BASE = 10
 ELO_NORM = 400
+RATING_WEEK_DEGRADATION = 0.00
 
 
 
@@ -42,14 +46,19 @@ def independed_ELO(R_list, Q, base = ELO_BASE, norm = ELO_NORM):
 def ELO_estimate(R, rates, base = ELO_BASE, norm = ELO_NORM):
     return sum([ELO(R, r, base, norm) for r in rates])
 
-def estimate_p_values(R, rates, N, base = ELO_BASE, norm = ELO_NORM):
-    p = [0.0]*(len(rates)+2)
+def estimate_exact_prob(R, rates, base = ELO_BASE, norm = ELO_NORM):
+    p = [0.0]*(len(rates)+1)
     p[0] = 1
 
     for i in range(len(rates)):
         pq = ELO(R, rates[i], base, norm)
         for j in range(i+2):
             p[i+1-j] = p[i+1-j] * (1-pq) + p[i-j] * pq
+    return p
+
+
+def estimate_p_values(R, rates, N, base = ELO_BASE, norm = ELO_NORM):
+    p = estimate_exact_prob(R, rates, base, norm)
     return (sum(p[:N+1]), sum(p[N:]))
 
 def max_like(R, rates, gets, is_team = True, max_steps = 10000, eps = 0.00001, base = ELO_BASE, norm = ELO_NORM):
@@ -134,103 +143,103 @@ def get_player_rating(connection, playerid, releaseid):
         return rate["playerrating"]
 
 
-def process_one_tournament_from_database(tournamentid, releaseid, connection, individual_questions = True, cleanup = True):
-    if cleanup:
-        connection.executescript('DELETE FROM playerratingsdelta WHERE tournamentid='+str(tournamentid))
-        connection.executescript('DELETE FROM tournamentratings WHERE tournamentid='+str(tournamentid))
-        connection.executescript('DELETE FROM questionrating WHERE tournamentid='+str(tournamentid))
-    start_time = datetime.now()
-    print(start_time)
-    question_gets = {}
-    local_teams_rates = []
-    question_values = []
-    team_ids = []
-    team_gets = {}
-    player_based_team_ratings = {}
-    team_players_id = {}
-    players_num = {}
-    total_gets = 0
+# def process_one_tournament_from_database(tournamentid, releaseid, connection, individual_questions = True, cleanup = True):
+#     if cleanup:
+#         connection.executescript('DELETE FROM playerratingsdelta WHERE tournamentid='+str(tournamentid))
+#         connection.executescript('DELETE FROM tournamentratings WHERE tournamentid='+str(tournamentid))
+#         connection.executescript('DELETE FROM questionrating WHERE tournamentid='+str(tournamentid))
+#     start_time = datetime.now()
+#     print(start_time)
+#     question_gets = {}
+#     local_teams_rates = []
+#     question_values = []
+#     team_ids = []
+#     team_gets = {}
+#     player_based_team_ratings = {}
+#     team_players_id = {}
+#     players_num = {}
+#     total_gets = 0
     
-    max_qid = 0
+#     max_qid = 0
 
-    Q_WARN  = True
+#     Q_WARN  = True
 
-    tournament_result = connection.execute('SELECT teamid, mask, totalquestions FROM results WHERE tournamentid='+str(tournamentid)).fetchall()
+#     tournament_result = connection.execute('SELECT teamid, mask, totalquestions FROM results WHERE tournamentid='+str(tournamentid)).fetchall()
     
-    for t in tournament_result:
-        qid = 0
-        if not t["teamid"] in team_gets:
-            team_gets[t["teamid"]] = 0
+#     for t in tournament_result:
+#         qid = 0
+#         if not t["teamid"] in team_gets:
+#             team_gets[t["teamid"]] = 0
 
-        if individual_questions:
-            if t["mask"] == None:
-                if Q_WARN:
-                    print("WARNING: No question data")#: " + str(t))
-                    Q_WARN = False
-                continue
-            for q in t["mask"]:
-                if not qid in question_gets:
-                    question_gets[qid] = 0
-                if q == "1":
-                    question_gets[qid] += 1
-                    team_gets[t["team"]["id"]] += 1
-                qid += 1
-        if max_qid < qid:
-            max_qid = qid
+#         if individual_questions:
+#             if t["mask"] == None:
+#                 if Q_WARN:
+#                     print("WARNING: No question data")#: " + str(t))
+#                     Q_WARN = False
+#                 continue
+#             for q in t["mask"]:
+#                 if not qid in question_gets:
+#                     question_gets[qid] = 0
+#                 if q == "1":
+#                     question_gets[qid] += 1
+#                     team_gets[t["team"]["id"]] += 1
+#                 qid += 1
+#         if max_qid < qid:
+#             max_qid = qid
 
-        else:
-            if not "totalquestions" in t:
-                continue
-            if t["totalquestions"] is None:
-                continue
-            team_gets[t["teamid"]] = t["totalquestions"]
-            total_gets += t["totalquestions"]
+#         else:
+#             if not "totalquestions" in t:
+#                 continue
+#             if t["totalquestions"] is None:
+#                 continue
+#             team_gets[t["teamid"]] = t["totalquestions"]
+#             total_gets += t["totalquestions"]
 
-        #TODO: подумать про командный рейтинг
-        # if not t["teamid"] in teams_ratings:
-        #     teams_ratings[t["teamid"]] = TEAM_START_RATING
+#         #TODO: подумать про командный рейтинг
+#         # if not t["teamid"] in teams_ratings:
+#         #     teams_ratings[t["teamid"]] = TEAM_START_RATING
         
-    #roster
-    for rosterinfo in connection.execute('SELECT teamid, playerid FROM roster WHERE tournamentid='+str(tournamentid)).fetchall():
-        if not rosterinfo["teamid"] in team_players_id:
-            team_players_id[rosterinfo["teamid"]] = []
-        team_players_id[rosterinfo["teamid"]].append(rosterinfo["playerid"])
+#     #roster
+#     for rosterinfo in connection.execute('SELECT teamid, playerid FROM roster WHERE tournamentid='+str(tournamentid)).fetchall():
+#         if not rosterinfo["teamid"] in team_players_id:
+#             team_players_id[rosterinfo["teamid"]] = []
+#         team_players_id[rosterinfo["teamid"]].append(rosterinfo["playerid"])
     
-    for teamid in team_players_id:
-        pl_rates = []
-        for playerid in team_players_id[teamid]:
-            pl_rates.append(get_player_rating(connection, playerid, releaseid))
+#     for teamid in team_players_id:
+#         pl_rates = []
+#         for playerid in team_players_id[teamid]:
+#             pl_rates.append(get_player_rating(connection, playerid, releaseid))
 
-        players_num[teamid] = len(pl_rates)
-        if len(pl_rates) > 6:
-            player_based_team_ratings[teamid] = independed_ELO(sorted(pl_rates)[-6:], INDEPNDENT_SKILL_QUESTION)
-        else:
-            player_based_team_ratings[teamid] = independed_ELO(pl_rates, INDEPNDENT_SKILL_QUESTION)
+#         players_num[teamid] = len(pl_rates)
+#         if len(pl_rates) > 6:
+#             player_based_team_ratings[teamid] = independed_ELO(sorted(pl_rates)[-6:], INDEPNDENT_SKILL_QUESTION)
+#         else:
+#             player_based_team_ratings[teamid] = independed_ELO(pl_rates, INDEPNDENT_SKILL_QUESTION)
 
-        local_teams_rates.append(player_based_team_ratings[teamid])
-        team_ids.append(teamid)
+#         local_teams_rates.append(player_based_team_ratings[teamid])
+#         team_ids.append(teamid)
     
-    print("Data preparation: " + str(datetime.now() - start_time))
+#     print("Data preparation: " + str(datetime.now() - start_time))
     
-    if individual_questions:
-        for q in range(max_qid):
-            question_values.append(max_like(1000, local_teams_rates, question_gets[q], False))
-    else:
-        qval = max_like(1000, local_teams_rates, total_gets/question_number, False)
-        for q in range(question_number):
-            question_values.append(qval)
+#     if individual_questions:
+#         for q in range(max_qid):
+#             question_values.append(max_like(1000, local_teams_rates, question_gets[q], False))
+#     else:
+#         qval = max_like(1000, local_teams_rates, total_gets/question_number, False)
+#         for q in range(question_number):
+#             question_values.append(qval)
 
-    team_delta = {}
-    player_delta = {}
-    for tm in team_ids:
-        team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], question_values)) * DELTA_MULTIPLIER
-        w = 1.
-        if players_num[tm] > 6:
-            w = w*6 /players_num[tm]
-        for pl in team_players_id[tm]:
-            player_delta[pl] = team_delta[tm] * w
-    print("Totaly: " + str(datetime.now() - start_time))
-    return (player_based_team_ratings, question_values, player_delta)
+#     team_delta = {}
+#     player_delta = {}
+#     for tm in team_ids:
+#         team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], question_values)) * DELTA_MULTIPLIER
+#         w = 1.
+#         if players_num[tm] > 6:
+#             w = w*6 /players_num[tm]
+#         for pl in team_players_id[tm]:
+#             player_delta[pl] = team_delta[tm] * w
+#     print("Totaly: " + str(datetime.now() - start_time))
+#     return (player_based_team_ratings, question_values, player_delta)
 
 
 
@@ -251,55 +260,27 @@ def put_tournament_into_DB(tournamentid, tournament_result, connection):
     connection.comit()           
 
 
-def process_one_tournament(teams_ratings, tournament_result, players_rating, individual_questions = True, question_number = 36): 
+def process_one_tournament(teams_ratings, tournament_result, players_rating, individual_questions = True, question_number = 36, tournament_weight = NON_RATE_DELTA_MULTIPLIER, detailed_print = False) : 
     start_time = datetime.now()
-    print(start_time)
+    if detailed_print:
+        print(start_time)
+
     question_gets = {}
     local_teams_rates = []
     question_values = []
-    team_ids = []
     team_gets = {}
     player_based_team_ratings = {}
     team_players_id = {}
     places = []
-    B_predicted_places = []
     players_num = {}
     total_gets = 0
     
     max_qid = 0
-    bad_rates = 0
 
     Q_WARN  = True
 
     for t in tournament_result:
-        qid = 0
-        if not t["team"]["id"] in team_gets:
-            team_gets[t["team"]["id"]] = 0
 
-        if individual_questions:
-            if t["mask"] == None:
-                if Q_WARN:
-                    print("WARNING: No question data")#: " + str(t))
-                    Q_WARN = False
-                continue
-            for q in t["mask"]:
-                if not qid in question_gets:
-                    question_gets[qid] = 0
-                if q == "1":
-                    question_gets[qid] += 1
-                    team_gets[t["team"]["id"]] += 1
-                qid += 1
-        else:
-            if not "questionsTotal" in t:
-                continue
-            if t["questionsTotal"] is None:
-                continue
-            team_gets[t["team"]["id"]] = t["questionsTotal"]
-            total_gets += t["questionsTotal"]
-
-        if not t["team"]["id"] in teams_ratings:
-            teams_ratings[t["team"]["id"]] = TEAM_START_RATING
-        
         pl_rates = []
         team_players_id[t["team"]["id"]] = []
         for pl in t["teamMembers"]:
@@ -307,84 +288,110 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
                 players_rating[pl["player"]["id"]] = PLAYER_START_RATING
             pl_rates.append(players_rating[pl["player"]["id"]])
             team_players_id[t["team"]["id"]].append(pl["player"]["id"])
+        
         players_num[t["team"]["id"]] = len(pl_rates)
 
         if len(pl_rates) == 0:
-            print("Skip team", t["team"]["id"], "because no players")
+            print("Team", t["team"]["id"], "has no players")
+            player_based_team_ratings[t["team"]["id"]] = None
             continue
 
         if len(pl_rates) > 6:
             player_based_team_ratings[t["team"]["id"]] = independed_ELO(sorted(pl_rates)[-6:], INDEPNDENT_SKILL_QUESTION)
         else:
-            # print(pl_rates)
             player_based_team_ratings[t["team"]["id"]] = independed_ELO(pl_rates, INDEPNDENT_SKILL_QUESTION)
 
-        places.append(t["position"])
 
-        if "rating" in t:
-            if t["rating"] != None:
-                if "predictedPosition" in t["rating"]:
-                    B_predicted_places.append(t["rating"]["predictedPosition"])
-                else:
-                    B_predicted_places.append(10000)
-                    bad_rates += 1
-                    print("WARNING: no predictedPosition in rating: " + str(t) )
+        qid = 0
+        if not t["team"]["id"] in team_gets:
+            team_gets[t["team"]["id"]] = 0
+
+        if individual_questions:
+            if t["mask"] is None:
+                if Q_WARN:
+                    print("WARNING: No question data")#: " + str(t))
+                    Q_WARN = False
+                team_gets[t["team"]["id"]] = None
+                # continue
             else:
-                B_predicted_places.append(10000)
-                bad_rates += 1
-                print("WARNING: rating is empty:  " + str(t) )
+                for q in t["mask"]:
+                    if not qid in question_gets:
+                        question_gets[qid] = 0
+                    if q == "1":
+                        question_gets[qid] += 1
+                        team_gets[t["team"]["id"]] += 1
+                    qid += 1
         else:
-            B_predicted_places.append(10000)
-            bad_rates += 1
-            print("WARNING: no rating: " + str(t) )
+            if not "questionsTotal" in t:
+                team_gets[t["team"]["id"]] = None
+            elif t["questionsTotal"] is None:
+                team_gets[t["team"]["id"]] = None
+            elif t["questionsTotal"] == 0:
+                if not "position" in t:
+                    team_gets[t["team"]["id"]] = None
+                if t["position"] == 9999:
+                    team_gets[t["team"]["id"]] = None
+            else:
+                team_gets[t["team"]["id"]] = t["questionsTotal"]
+                total_gets += t["questionsTotal"]
+
+        # if not t["team"]["id"] in teams_ratings:
+        #     teams_ratings[t["team"]["id"]] = TEAM_START_RATING
         
-        local_teams_rates.append(player_based_team_ratings[t["team"]["id"]])
-        team_ids.append(t["team"]["id"])
+
+        places.append(t["position"])
+        
+        if not team_gets[t["team"]["id"]] is None:
+            local_teams_rates.append(player_based_team_ratings[t["team"]["id"]])
         if max_qid < qid:
             max_qid = qid
 
 
-
-
-
     score = {}
-    score["spearman"] = {}
-    score["spearman"]["B"] = calculate_score(places, B_predicted_places, True) 
-    score["spearman"]["C"] = calculate_score(places, local_teams_rates, False)
-    score["NDCG"] = {}
-    if bad_rates == len(places):
-        score["NDCG"]["B"] = math.nan 
-    else:
-        score["NDCG"]["B"] = calculate_NDCG(places, B_predicted_places, True)
-    score["NDCG"]["C"] = calculate_NDCG(places, local_teams_rates, False)
 
-
-    print("Score B: "+str(score["spearman"]["B"]) + "  Score C: "+str(score["spearman"]["C"]))
-    print("NDCG B: "+str(score["NDCG"]["B"]) + "  NDCG C: "+str(score["NDCG"]["C"]))
-
-    print("Data preparation: " + str(datetime.now() - start_time))
+    if detailed_print:
+        print("Data preparation: " + str(datetime.now() - start_time))
     
-#    print(player_based_team_ratings)
     if individual_questions:
         for q in range(max_qid):
             question_values.append(max_like(1000, local_teams_rates, question_gets[q], False))
     else:
         qval = max_like(1000, local_teams_rates, total_gets/question_number, False)
-        for q in range(question_number):
-            question_values.append(qval)
+        question_values = [qval]*question_number
+
+    
     team_delta = {}
     player_delta = {}
-    for tm in team_ids:
-        team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], question_values)) * DELTA_MULTIPLIER
-        w = 1.
-        if players_num[tm] > 6:
-            w = w*6 /players_num[tm]
-        for pl in team_players_id[tm]:
-            player_delta[pl] = team_delta[tm] * w
-    print("Totaly: " + str(datetime.now() - start_time))
+
+    # print(team_gets, team_players_id)
+
+    for tm in player_based_team_ratings:
+        if player_based_team_ratings[tm] is None:
+            continue
+        if team_gets[tm] is None:
+            team_delta[tm] = None    
+        else:
+            team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], question_values)) * tournament_weight
+            w = 1.
+            if players_num[tm] > 6:
+                w = w*6 /players_num[tm]
+            
+            for pl in team_players_id[tm]:
+                player_delta[pl] = team_delta[tm] * w
+
+    # print("t", team_delta, player_delta)
+
+    if detailed_print:
+        print("Totaly: " + str(datetime.now() - start_time))
+    
     return (player_based_team_ratings, question_values, player_delta, score)
 
-def process_all_data(SUB_DIR = "Output/TEST"):
+def season_to_date(seasone_num):
+    # return(datetime.
+    pass
+
+
+def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
 
     team_rates = {}
     player_ratings = {}
@@ -393,16 +400,18 @@ def process_all_data(SUB_DIR = "Output/TEST"):
 
     DBconn = sqlite3.connect(r'Output/rating.db')
     cursor = DBconn.cursor()
-    # DBconn.executescript("DELETE FROM playerratings")
-
-    # connector.load_cache("cache_large.json")
     
+    print("load cache")
     connector.load_cache("cache.json")
 
-    # with open('all_rated_tours_2013.json', 'r', encoding="utf8") as JSON:
-    #     tournaments_info_list = json.load(JSON)
 
-    tournaments_info_list = connector.get_all_rated_tournaments()
+    print("reading tournaments_info")
+    # tournaments_info_list = connector.get_all_rated_tournaments()
+ 
+    with open('tournaments.json', 'r', encoding="utf8") as JSON:
+        tournaments_info_list = json.load(JSON)
+
+    # tournaments_info_list = connector.get_all_tournaments(startdate_after="2021-09-01")
 
     # with open("tournaments.json", "w") as file:
     #     json.dump(tournaments_info_list, file)
@@ -411,9 +420,15 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     for t in tournaments_info_list:
         tournament_info_dict[t["id"]] = t
 
-    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2024-01-16"]
+    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if (t["dateEnd"] < "2024-10-11")and(t["type"]["id"] != 5)]
     # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2021-09-16"]
     ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
+
+    # force_after = "2024-04-15"
+
+    # force_after = "2024-06-15"
+
+    force_after = "2024-12-15"
 
     results = {}
     release_results = {0:{}}
@@ -425,7 +440,9 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     release_num = 0
     tournaments_by_reliases = [[]]
 
-    print_data = True
+    print_data = False
+
+    print_datailes = False
   
     if print_data:
         try:
@@ -433,11 +450,13 @@ def process_all_data(SUB_DIR = "Output/TEST"):
         except:
             pass
 
-    for t in ordered_tournament_ids[:]:
+    for t in tqdm(ordered_tournament_ids[:]):
 
         start = datetime.now()
-        print("Process tournament "+str(t)+ " start at "+str(start))
-        data = connector.tournament_results(t, False)
+        if print_datailes:
+            print("Process tournament "+str(t)+ " start at "+str(start))
+        
+        data = connector.tournament_results(t, tournament_info_dict[t]["dateEnd"] > force_after)
 
         players_names = set()
         for tm in data:
@@ -449,11 +468,14 @@ def process_all_data(SUB_DIR = "Output/TEST"):
 
 
 
-        print("Data get took "+str(datetime.now() - start))
+        if print_datailes:
+            print("Data get took "+str(datetime.now() - start))
         cursor.executemany('INSERT OR IGNORE INTO players VALUES(?,?,?,?,?);',players_names)
 
 
         while not tournament_info_dict[t]["dateEnd"] < str(release_date):
+            for pid in player_ratings:
+                player_ratings[pid] -= RATING_WEEK_DEGRADATION*(player_ratings[pid] - PLAYER_START_RATING)
             records = []
             for tid in tournaments_by_reliases[-1]:
                 for pid in results[tid]["delta_players"]:
@@ -468,6 +490,8 @@ def process_all_data(SUB_DIR = "Output/TEST"):
             records = []
             for pid in player_ratings:
                 records.append((release_num, pid, player_ratings[pid]))
+                if not pid in release_results[release_num-1]["player_ratings"]:
+                    records.append((release_num-1, pid, PLAYER_START_RATING))
 
             #insert multiple records in a single query
             cursor.executemany('INSERT INTO playerratings VALUES(?,?,?);',records)
@@ -476,7 +500,8 @@ def process_all_data(SUB_DIR = "Output/TEST"):
             release_num += 1
             release_date += timedelta(days = 7)
             release_results[release_num] = {"release_date": str(release_date)}
-            print("Start working on reliase "+str(release_num)+":  "+str(release_date))
+            if print_datailes:
+                print("Start working on release "+str(release_num)+":  "+str(release_date))
         
         questionQty = 0
         # print(tournament_info_dict[t]["questionQty"])
@@ -491,8 +516,15 @@ def process_all_data(SUB_DIR = "Output/TEST"):
         else:
             individual = False 
 
-        delta, qv, delta_pl, score = process_one_tournament(team_rates, data, player_ratings, individual, questionQty)
- 
+        individual  = any(fulldata)
+
+        if tournament_info_dict[t]["maiiRating"]:
+            tournament_weight = DELTA_MULTIPLIER
+        else:
+            tournament_weight = NON_RATE_DELTA_MULTIPLIER
+            
+        delta, qv, delta_pl, score = process_one_tournament(team_rates, data, player_ratings, individual, questionQty, tournament_weight)
+
         if print_data:
             team_places = sorted([x for x in delta], key = lambda x: -delta[x])
             fname = SUB_DIR + "/" + str(release_num)+"_"+str(t)+".csv"
@@ -513,19 +545,21 @@ def process_all_data(SUB_DIR = "Output/TEST"):
             results_data = []
             roster_data = []
             legs_data = []
-            team_places = sorted([x for x in delta], key = lambda x: -delta[x])
+            # team_places = sorted([x for x in delta], key = lambda x: -delta[x])
             for my_t in data:
-                if (not (my_t["mask"] == None)) |  (not (my_t["questionsTotal"] == None)):
+                if ((not (my_t["mask"] == None)) |  (not (my_t["questionsTotal"] == None))) and (not delta[my_t["team"]["id"]] is None):
                     if my_t["team"]["id"] in delta:
                         atmost, atleast = estimate_p_values(delta[my_t["team"]["id"]], qv, my_t["questionsTotal"])
-                        tournamentrating_data.append((t, my_t["team"]["id"], delta[my_t["team"]["id"]], ELO_estimate(delta[my_t["team"]["id"]], qv), atleast, atmost))
+                        team_perf = max_like(1000, qv, my_t["questionsTotal"])
+                        tournamentrating_data.append((t, my_t["team"]["id"], delta[my_t["team"]["id"]], ELO_estimate(delta[my_t["team"]["id"]], qv), atleast, atmost, team_perf))
                         results_data.append((t, my_t["team"]["id"], my_t["position"], my_t["questionsTotal"], my_t["mask"], my_t["current"]["name"]))
                         for pld in my_t["teamMembers"]:
                             roster_data.append((t, pld["player"]["id"], my_t["team"]["id"]))
                         q_diff.append(abs(my_t["questionsTotal"] - ELO_estimate(delta[my_t["team"]["id"]], qv)))
                         q2_diff.append((my_t["questionsTotal"] - ELO_estimate(delta[my_t["team"]["id"]], qv))**2)
                     q_last = 0
-                    if (not my_t["mask"] is None) and (my_t["team"]["id"] in delta):
+                    
+                    if (not my_t["mask"] is None) and (not delta[my_t["team"]["id"]] is None):
                         for qqt in sorted(tournament_info_dict[t]["questionQty"], key=lambda x: int(x)):
                             leg_N = tournament_info_dict[t]["questionQty"][qqt]
                             q_cur = q_last + leg_N
@@ -538,26 +572,27 @@ def process_all_data(SUB_DIR = "Output/TEST"):
             
         cursor.executemany('INSERT INTO questionrating VALUES(?,?,?);',qvalues)            
         cursor.executemany('INSERT INTO roster VALUES(?,?,?);',roster_data)        
-        cursor.executemany('INSERT INTO tournamentratings VALUES(?,?,?,?,?,?);',tournamentrating_data)    
+        cursor.executemany('INSERT INTO tournamentratings VALUES(?,?,?,?,?,?,?);',tournamentrating_data)    
         cursor.executemany('INSERT INTO results VALUES(?,?,?,?,?,?);',results_data)        
         cursor.executemany('INSERT INTO tournaments_legs VALUES(?,?,?,?,?,?,?,?,?);',legs_data)        
         
-        cursor.execute("INSERT INTO tournaments VALUES(?,?,?,?);", (tournament_info_dict[t]["id"],tournament_info_dict[t]["name"], tournament_info_dict[t]["dateStart"],tournament_info_dict[t]["dateEnd"]))
+        cursor.execute("INSERT INTO tournaments VALUES(?,?,?,?,?,?);", (tournament_info_dict[t]["id"],tournament_info_dict[t]["name"], tournament_info_dict[t]["dateStart"],tournament_info_dict[t]["dateEnd"], tournament_info_dict[t]["type"]["name"], tournament_info_dict[t]["type"]["id"]))
 
         results[t] = {}
         results[t]["qv"] = qv
         results[t]["delta_players"] = delta_pl
         results[t]["team_rates"] = delta
-        results[t]["score"] = score
-        results[t]["SSE"] = sum(q2_diff)
-        results[t]["SAE"] = sum(q_diff)
 
-        if len(q_diff) >0:
-            results[t]["MSE"] = sum(q2_diff)/len(q2_diff)
-            results[t]["MAE"] = sum(q_diff)/len(q_diff)
-        else:
-            results[t]["MSE"] = 0
-            results[t]["MAE"] = 0
+        # results[t]["score"] = score
+        # results[t]["SSE"] = sum(q2_diff)
+        # results[t]["SAE"] = sum(q_diff)
+
+        # if len(q_diff) >0:
+        #     results[t]["MSE"] = sum(q2_diff)/len(q2_diff)
+        #     results[t]["MAE"] = sum(q_diff)/len(q_diff)
+        # else:
+        #     results[t]["MSE"] = 0
+        #     results[t]["MAE"] = 0
         
         tournaments_by_reliases[-1].append(t)
     #    for pl in delta_pl:
@@ -578,6 +613,9 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     records = []
     for pid in player_ratings:
         records.append((release_num, pid, player_ratings[pid]))
+        if not pid in release_results[release_num-1]["player_ratings"]:
+            records.append((release_num-1, pid, PLAYER_START_RATING))
+
 
     cursor.executemany('INSERT INTO playerratings VALUES(?,?,?);',records)
 
@@ -591,30 +629,30 @@ def process_all_data(SUB_DIR = "Output/TEST"):
     # print("Done")
     ## Models comparison
 
-    WB = 0
-    WC = 0
-    D = 0
-    NWB = 0
-    NWC = 0
-    ND = 0
+    # WB = 0
+    # WC = 0
+    # D = 0
+    # NWB = 0
+    # NWC = 0
+    # ND = 0
 
-    ordered_tournament_ids[-3:]
+    # ordered_tournament_ids[-3:]
 
-    for t in ordered_tournament_ids[-150:]:
-        print(t, results[t]["score"]["NDCG"]["B"], results[t]["score"]["NDCG"]["C"])
+    # for t in ordered_tournament_ids[-150:]:
+    #     print(t, results[t]["score"]["NDCG"]["B"], results[t]["score"]["NDCG"]["C"])
 
 
-    for t in ordered_tournament_ids[-150:]:
-        print(results[t]["score"]["spearman"]["B"][0], results[t]["score"]["spearman"]["C"][0])
-        if results[t]["score"]["spearman"]["B"][0] > results[t]["score"]["spearman"]["C"][0]: WB += 1
-        if results[t]["score"]["spearman"]["B"][0] < results[t]["score"]["spearman"]["C"][0]: WC += 1
-        if results[t]["score"]["spearman"]["B"][0] == results[t]["score"]["spearman"]["C"][0]: D += 1
-        if results[t]["score"]["NDCG"]["B"] > results[t]["score"]["NDCG"]["C"]: NWB += 1
-        if results[t]["score"]["NDCG"]["B"] < results[t]["score"]["NDCG"]["C"]: NWC += 1
-        if results[t]["score"]["NDCG"]["B"] == results[t]["score"]["NDCG"]["C"]: ND += 1
+    # for t in ordered_tournament_ids[-150:]:
+    #     print(results[t]["score"]["spearman"]["B"][0], results[t]["score"]["spearman"]["C"][0])
+    #     if results[t]["score"]["spearman"]["B"][0] > results[t]["score"]["spearman"]["C"][0]: WB += 1
+    #     if results[t]["score"]["spearman"]["B"][0] < results[t]["score"]["spearman"]["C"][0]: WC += 1
+    #     if results[t]["score"]["spearman"]["B"][0] == results[t]["score"]["spearman"]["C"][0]: D += 1
+    #     if results[t]["score"]["NDCG"]["B"] > results[t]["score"]["NDCG"]["C"]: NWB += 1
+    #     if results[t]["score"]["NDCG"]["B"] < results[t]["score"]["NDCG"]["C"]: NWC += 1
+    #     if results[t]["score"]["NDCG"]["B"] == results[t]["score"]["NDCG"]["C"]: ND += 1
 
-    print(WB, WC, D)
-    print(NWB, NWC, ND)
+    # print(WB, WC, D)
+    # print(NWB, NWC, ND)
 
     # trnm_list = [9207, 9693, 9737, 9423,  9543, 9582, 9205, 9493, 9147, 9626]
     # for trnm in trnm_list:
@@ -633,13 +671,13 @@ def clear_db():
     conn = sqlite3.connect(r'Output/rating.db')
     try:
         conn.executescript('''
-        CREATE TABLE tournaments ( tournamentid integer primary key, name varchar(255), startdate date, enddate date ); 
+        CREATE TABLE tournaments ( tournamentid integer primary key, name varchar(255), startdate date, enddate date, typeoft_id INTEGER, type TEXT); 
         CREATE TABLE roster ( tournamentid integer, playerid integer, teamid integer ); 
         CREATE TABLE results ( tournamentid integer, teamid integer, place real, totalquestions integer, mask varchar(255), teamname varchar(255));
         CREATE TABLE releases ( releaseid integer primary key, relisdate date);
         CREATE TABLE playerratings ( releaseid integer, playerid integer, playerrating real);
         CREATE TABLE playerratingsdelta ( releaseid integer, playerid integer, deltarating real, tournamentid integer);
-        CREATE TABLE tournamentratings ( tournamentid integer, teamid integer, teamrating real, predictedquestions real, atleastprob real, atmostprob real);
+        CREATE TABLE tournamentratings ( tournamentid integer, teamid integer, teamrating real, teamperformance real, predictedquestions real, atleastprob real, atmostprob real);
         CREATE TABLE players ( playerid integer primary key, name varchar(255), surname varchar(255), patronim varchar(255), fullname varchar(255));
         CREATE TABLE questionrating ( tournamentid int, questionid int, hardnes real);
         CREATE TABLE teams ( teamid integer primary key, teamname varchar(255));
@@ -666,4 +704,4 @@ def clear_db():
 
 if __name__ == "__main__":
     clear_db()
-    process_all_data()
+    process_all_data(start_from_release = 130)
