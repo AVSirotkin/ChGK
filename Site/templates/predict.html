@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Прогноз результатов турнира {{tournament_info["name"]}}</h2>
+
+<h3>Сложность вопросов как в турнире {{qtournament_info["name"]}}</h3>
+
+<script>
+    
+    function my_show(teamid, tournamentid) {fetch("/teams/"+teamid+"/"+tournamentid /*, options */)
+  .then((response) => response.text())
+  .then((html) => {
+      document.getElementById("roster"+teamid).innerHTML = html;
+  })
+  }
+  
+   
+</script>
+
+
+<h2> Таблица с прогнозом по взятым вопросам</h2>
+
+<table id="Tournament" class="table table-striped">
+    <thead>
+      <tr>
+        <th rowspan="2">Место</th>
+        <th rowspan="2">Команда</th>
+        <th rowspan="2">Сила команды</th>
+        <!-- <th rowspan="2">Показанная сила</th> -->
+        <!-- <th rowspan="2">Взято вопросов</th> -->
+        <th rowspan="2">Прогноз по вопросам</th>
+        <!-- <th rowspan="2">Дельта</th> -->
+        <!-- <th colspan="2">Соответствие модели</th> -->
+      </tr>
+      <!-- <tr>
+        <th>Не меньше</th>
+        <th>Не больше</th>
+      </tr>
+    </thead> -->
+    <tbody>
+      {% for tourresult in tourresults %}
+        <tr id="{{tourresult.teamid}}">
+          <td>{{ tourresult.place }}</td>
+          <td><a href="/teams/{{ tourresult.teamid }}"> {{ tourresult.teamname }}</a><div id="roster{{tourresult.teamid}}"> <div onclick="my_show({{tourresult.teamid}}, {{tournamentid}})">(состав)</div></div></td>
+          <td>{{ "%.2f"|format(tourresult.teamrating) }}</a></td>
+          <!-- <td>{{ "%.2f"|format(tourresult.teamperformance) }}</a></td> -->
+          <!-- <td>{{ tourresult.totalquestions }}<div id="legquestions{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td> -->
+          <td>{{ "%.2f"|format(tourresult.predictedquestions) }} <div id="predictedquestions{{tourresult.teamid}}"> <!-- <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div> --></div></td>
+          <!-- <td>{{ "%.2f"|format(tourresult.totalquestions - tourresult.predictedquestions) }}</td> -->
+          <!-- <td>{{ "%.2f"|format(tourresult.atleastprob*100)}}% <div id="atleastprob{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td> -->
+          <!-- <td>{{ "%.2f"|format(tourresult.atmostprob*100)}}% <div id="atmostprob{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td> -->
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+
+{% endblock %}

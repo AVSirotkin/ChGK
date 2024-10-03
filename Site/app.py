@@ -2,6 +2,11 @@ import sqlite3
 from flask import Flask, render_template, request
 import datetime
 import time
+import sys
+sys.path.append('../API/')
+sys.path.append('../Ratings')
+sys.path.append('./Ratings')
+import rating as rt
 
 app = Flask(__name__)
 
@@ -99,7 +104,7 @@ def showTournamentInfo(tournamentid):
     tournaments = conn.execute('SELECT * FROM results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + #+
-    ' ORDER BY totalquestions DESC;'
+    ' ORDER BY totalquestions DESC, teamrating DESC;'
     ).fetchall()
     # print(tuple(tournaments[0]))
     # print(tournaments[0].keys())
@@ -186,6 +191,47 @@ def showTeamTournamentInfo(teamid, tournamentid):
     # print("times",ts2-ts3, ts3-ts1, ts2-ts, ts1 - ts)
     return text
     # return render_template("roster.html", roster=roster)
+
+
+@app.route("/predict/<int:tournamentid>/<int:questionstournamentid>", subdomain="rating")
+def showPrediction(tournamentid, questionstournamentid):
+    
+    conn = get_db_connection()
+    # print("conn", time.time()-ts)
+
+    tournament_info = conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(tournamentid)).fetchone() 
+    qtournament_info = conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(questionstournamentid)).fetchone() 
+
+    tournaments = conn.execute('SELECT * FROM results '+
+    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
+    ' WHERE results.tournamentid = '+str(tournamentid) + #+
+    ' ORDER BY teamrating DESC;'
+    ).fetchall()
+
+    qv_info = conn.execute('SELECT * FROM questionrating ' +  
+    ' WHERE tournamentid = '+str(questionstournamentid) +";"
+    ).fetchall()
+    qv = [r["hardnes"] for r in qv_info]
+
+    
+    trn = []
+    pls = 0
+    for t in tournaments:
+        trn.append(dict(t))
+        trn[-1]["predictedquestions"] = rt.ELO_estimate(trn[-1]["teamrating"], qv)
+        pls += 1
+        trn[-1]["place"] = pls
+
+    # print(tuple(tournaments[0]))
+    # print(tournaments[0].keys())
+    # print(tournaments[0]['teamid'])
+    conn.close()
+    # print("All time", time.time()-ts)
+    if tournament_info: 
+        return render_template("predict.html", tourresults=trn, tournamentid = tournamentid, tournament_info = tournament_info, qtournament_info = qtournament_info)
+    else:
+        return "Данных о турнире "+str(tournamentid)+" не найдено"
+    # return render_template("predict.html",)
 
 
 
