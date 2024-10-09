@@ -7,37 +7,34 @@
     <thead>
       <tr>
         <th>Релиз</th>
+        <th>Рейтинг</th>
+        <th>Место</th>
         <th>Турнир</th>
         <th>Команда</th>
         <th>Дельта</th>
       </tr>
     </thead>
     <tbody>
-      {% for delta in deltas %}
-        <tr>
-            <td>{{ delta.releaseid }}</td>
-            <td><a href="/tournament/{{ delta.tournamentid }}">{{ delta.name }}</a></td>
-            <td><a href="/teams/{{ delta.teamid }}">{{ delta.teamname }}</a></td>
-            <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ delta.deltarating }}</a></td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  История рейтинга
-  <table id="ratings" class="table table-striped">
-    <thead>
-      <tr>
-        <th>Релиз</th>
-        <th>Рейтинг</th>
-      </tr>
-    </thead>
-    <tbody>
       {% for rating in ratings %}
+        {% if rating.tournaments_count > 0 %}
         <tr>
-          <td>{{ rating.releaseid }}</td>
-          <td>{{ rating.playerrating }}</td>
+            <td rowspan="{{rating.tournaments_count}}">{{ rating.releaseid }}</td>
+            <td rowspan="{{rating.tournaments_count}}">{{ "%.2f"|format(rating.rating)  }}</td>
+            <td rowspan="{{rating.tournaments_count}}">{{ rating.place }}</td>
+            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}">{{ rating.tournaments_details[0].name }}</a></td>
+            <td><a href="/teams/{{ rating.tournaments_details[0].teamid }}">{{ rating.tournaments_details[0].teamname }}</a></td>
+            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ rating.tournaments_details[0].deltarating }}</a></td>
         </tr>
+        {% for delta in rating.tournaments_details[1:]%}
+        <tr>
+          <td><a href="/tournament/{{ delta.tournamentid }}">{{ delta.name }}</a></td>
+          <td><a href="/teams/{{ delta.teamid }}">{{ delta.teamname }}</a></td>
+          <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ delta.deltarating }}</a></td>
+        </tr>
+
+        {% endfor %}
+     
+        {% endif %}
       {% endfor %}
     </tbody>
   </table>

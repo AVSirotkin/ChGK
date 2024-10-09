@@ -31,5 +31,11 @@
       {% endfor %}
     </tbody>
   </table>
+  
+  {% if page > 1: %}
+  <a href="players?page={{page-1}}">Предыдущие</a>   
+  {% endif %}
 
+
+  <a href="players?page={{page+1}}">Следующие</a> 
 {% endblock %}

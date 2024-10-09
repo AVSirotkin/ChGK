@@ -17,9 +17,9 @@ def get_db_connection():
     return conn
 
 
-@app.route('/', subdomain="rating")
-def ratingindex():
-    return "secret rating page"
+# @app.route('/', subdomain="rating")
+# def ratingindex():
+#     return "secret rating page"
 
 
 
@@ -53,6 +53,7 @@ def showAllPlayers(season = 0):
     return render_template("allplayers.html", ratings=ratings, page = page)
 
 
+@app.route('/', subdomain="rating")
 @app.route('/teams', subdomain="rating")
 def showAllTeams(season = 0):
     page = request.args.get('page', 1, type=int)
@@ -91,7 +92,21 @@ def showPlayerInfo(playerid):
     playername = conn.execute('SELECT fullname from players WHERE playerid='+str(playerid)).fetchone()["fullname"]
     conn.close()
     print("deltas", ts1 - ts, "ratings", ts2-ts1)
-    return render_template("player.html", ratings=ratings, deltas=deltas, playerid=playerid, playername=playername)
+    rate_list = []
+    deltas_idx = 0
+    for r in ratings:
+        # print(dict(r))
+        rate_list.append({"releaseid":r["releaseid"], "tournaments_count":0, "tournaments_details":[], "place": r["place"], "rating": r["playerrating"]})
+        while deltas_idx < len(deltas):
+            if rate_list[-1]["releaseid"] == deltas[deltas_idx]["releaseid"]:
+                rate_list[-1]["tournaments_count"] += 1
+                rate_list[-1]["tournaments_details"].append(deltas[deltas_idx])
+                deltas_idx += 1
+            else:
+                break
+
+
+    return render_template("player.html", ratings=rate_list, playerid=playerid, playername=playername)
 
 @app.route("/tournament/<int:tournamentid>", subdomain="rating")
 def showTournamentInfo(tournamentid):
