@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 
 {% block content %}
+<h2>Команда {{team_name}}</h2> 
+{% if team_rating > 0 %}
+<h3>Рейтинг: {{"%.2f"|format(team_rating)}}</h3>
+<h4>Базовый состав:</h4>
+
+{% for t in team_base_roster %}
+{{"%.2f"|format(t.playerrating)}} <a href="/player/{{t.playerid}}"> {{t.fullname}} </a> <br>
+{% endfor %}
+
+{% endif %}
+
+
   <table id="Tournaments" class="table table-striped">
     <thead>
       <tr>

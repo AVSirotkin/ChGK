@@ -1,12 +1,30 @@
 {% extends "base.html" %}
 
 {% block content %}
+<script>
+  function show_all(){
+        // var sel.options[sel.selectedIndex].text
+        console.log("click")
+        // console.log(document.document.getElementById('result_tr'))
+        var el = document.getElementsByClassName('result_tr')
+        // console.log(el)
+        for (var i = 0, ilen = el.length - 1; i < ilen; i++) {
+        el[i].style.display = 'table-row';
+}
+          
+   }
+</script>
+
+
   <h2>{{playerid}} {{playername}}</h2>
+
+  <div id="hider" onclick="show_all()">Показать релизы без турниров</div>
 
   <table id="deltas" class="table table-striped">
     <thead>
       <tr>
         <th>Релиз</th>
+        <th>Дата</th>
         <th>Рейтинг</th>
         <th>Место</th>
         <th>Турнир</th>
@@ -19,21 +37,29 @@
         {% if rating.tournaments_count > 0 %}
         <tr>
             <td rowspan="{{rating.tournaments_count}}">{{ rating.releaseid }}</td>
+            <td rowspan="{{rating.tournaments_count}}">{{ rating.releasename }}</td>
             <td rowspan="{{rating.tournaments_count}}">{{ "%.2f"|format(rating.rating)  }}</td>
             <td rowspan="{{rating.tournaments_count}}">{{ rating.place }}</td>
             <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}">{{ rating.tournaments_details[0].name }}</a></td>
             <td><a href="/teams/{{ rating.tournaments_details[0].teamid }}">{{ rating.tournaments_details[0].teamname }}</a></td>
-            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ rating.tournaments_details[0].deltarating }}</a></td>
+            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ "%.2f"|format(rating.tournaments_details[0].deltarating) }}</a></td>
         </tr>
         {% for delta in rating.tournaments_details[1:]%}
         <tr>
           <td><a href="/tournament/{{ delta.tournamentid }}">{{ delta.name }}</a></td>
           <td><a href="/teams/{{ delta.teamid }}">{{ delta.teamname }}</a></td>
-          <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ delta.deltarating }}</a></td>
+          <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ "%.2f"|format(delta.deltarating) }}</a></td>
         </tr>
 
         {% endfor %}
-     
+        {% else %}
+        <tr class="result_tr" style="display: none;">
+          <td >{{ rating.releaseid }}</td>
+          <td >{{ rating.releasename }}</td>
+          <td >{{ "%.2f"|format(rating.rating)  }}</td>
+          <td >{{ rating.place }}</td>
+        <tr>
+    
         {% endif %}
       {% endfor %}
     </tbody>

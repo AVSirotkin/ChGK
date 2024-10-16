@@ -7,6 +7,7 @@ sys.path.append('../API/')
 sys.path.append('../Ratings')
 sys.path.append('./Ratings')
 import rating as rt
+import json
 
 app = Flask(__name__)
 
@@ -53,6 +54,15 @@ def showAllPlayers(season = 0):
     return render_template("allplayers.html", ratings=ratings, page = page)
 
 
+@app.route('/api/questions/<int:tournamentid>', subdomain="rating")
+def QuestionsHardnes(tournamentid):
+    conn = get_db_connection()
+    questions = conn.execute(f'SELECT hardnes FROM questionrating WHERE tournamentid == {tournamentid}').fetchall()
+    return json.dumps([x['hardnes'] for x in questions])
+
+
+
+
 @app.route('/', subdomain="rating")
 @app.route('/teams', subdomain="rating")
 def showAllTeams(season = 0):
@@ -96,7 +106,7 @@ def showPlayerInfo(playerid):
     deltas_idx = 0
     for r in ratings:
         # print(dict(r))
-        rate_list.append({"releaseid":r["releaseid"], "tournaments_count":0, "tournaments_details":[], "place": r["place"], "rating": r["playerrating"]})
+        rate_list.append({"releaseid":r["releaseid"],"releasename":rt.season_to_date_string(r["releaseid"]), "tournaments_count":0, "tournaments_details":[], "place": r["place"], "rating": r["playerrating"]})
         while deltas_idx < len(deltas):
             if rate_list[-1]["releaseid"] == deltas[deltas_idx]["releaseid"]:
                 rate_list[-1]["tournaments_count"] += 1
@@ -166,7 +176,7 @@ def showLegInfo(tournamentid, teamid):
 
 
 @app.route("/teams/<int:teamid>/<int:tournamentid>", subdomain="rating")
-def showTeamTournamentInfo(teamid, tournamentid):
+def showTeamTournamentInfo(teamid, tournamentid, return_html = True):
     ts = time.time()
     conn = get_db_connection()
     if tournamentid == 0:
@@ -202,9 +212,12 @@ def showTeamTournamentInfo(teamid, tournamentid):
     conn.close()
     ts2 = time.time()
     # text = '<br>'.join([str(round(t["playerrating"]))+" "+t["fullname"] for t in roster])
-    text = '<br>'.join([str(round(t["playerrating"]))+' <a href="/player/'+str(t["playerid"])+'"> '+t["fullname"] +"</a>" for t in roster])
-    # print("times",ts2-ts3, ts3-ts1, ts2-ts, ts1 - ts)
-    return text
+    if return_html:
+        text = '<br>'.join([str(round(t["playerrating"]))+' <a href="/player/'+str(t["playerid"])+'"> '+t["fullname"] +"</a>" for t in roster])
+        # print("times",ts2-ts3, ts3-ts1, ts2-ts, ts1 - ts)
+        return text
+    else:
+        return ([dict(x) for x in roster])
     # return render_template("roster.html", roster=roster)
 
 
@@ -279,6 +292,7 @@ def showCompare():
 @app.route("/teams/<int:teamid>", subdomain="rating")
 def showTeamInfo(teamid):
     conn = get_db_connection()
+    team_name = conn.execute(f'SELECT teamname FROM teams WHERE teamid = {teamid}').fetchone()["teamname"]
     tournaments = conn.execute('SELECT * FROM results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' + 
     ' JOIN tournaments ON results.tournamentid=tournaments.tournamentid' + 
@@ -289,7 +303,12 @@ def showTeamInfo(teamid):
     # print(tournaments[0].keys())
     # print(tournaments[0]['teamid'])
     conn.close()
-    return render_template("team.html", tourresults=tournaments, teamid = teamid)
+    team_base_roster = showTeamTournamentInfo(teamid, 0, False)
+    if len(team_base_roster)>0:
+        team_rating = rt.independed_ELO([x["playerrating"] for x in team_base_roster][:6])
+    else:
+        team_rating = 0
+    return render_template("team.html", tourresults=tournaments, teamid = teamid, team_base_roster = team_base_roster, team_rating = team_rating, team_name = team_name)
 
 @app.route("/tournaments", subdomain="rating")
 def showAllTournaments():

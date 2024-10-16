@@ -6,6 +6,8 @@
       <tr>
         <th>ID</th>
         <th>Название</th>
+        <th>Оценка слжности</th>
+
         <th>Дата окончания</th>
       </tr>
     </thead>
@@ -14,6 +16,7 @@
         <tr>
           <td>{{ tours.tournamentid }}</td>
           <td><a href="/tournament/{{ tours.tournamentid }}">{{ tours.name }}</a></td>
+          <td>{{"%.2f"|format(tours.hardnes)}}</td>
           <td>{{ tours.enddate }}</td>
         </tr>
       {% endfor %}
