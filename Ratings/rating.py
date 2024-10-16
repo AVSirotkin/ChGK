@@ -1,8 +1,7 @@
 from copy import deepcopy
 import os
-from turtle import color
 from scipy.stats import spearmanr
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import json
 import math
 import sys
@@ -18,7 +17,7 @@ import sqlite3
 
 MIN_QUESTION_RATING = 0
 MAX_QUESTION_RATING = 10000
-DELTA_MULTIPLIER = 10
+DELTA_MULTIPLIER = 3
 NON_RATE_DELTA_MULTIPLIER = 0.1
 INDEPNDENT_SKILL_QUESTION = 2000
 PLAYER_START_RATING = 1000
@@ -36,7 +35,7 @@ def ELO(R, Q, base = ELO_BASE, norm = ELO_NORM):
         print("got erroror: ", R, Q, base, norm)
         raise("ssss")
     
-def independed_ELO(R_list, Q, base = ELO_BASE, norm = ELO_NORM):
+def independed_ELO(R_list, Q = INDEPNDENT_SKILL_QUESTION, base = ELO_BASE, norm = ELO_NORM):
     p = 1
     for R in R_list:
         p *= ELO(Q, R)
@@ -47,14 +46,14 @@ def ELO_estimate(R, rates, base = ELO_BASE, norm = ELO_NORM):
     return sum([ELO(R, r, base, norm) for r in rates])
 
 def estimate_exact_prob(R, rates, base = ELO_BASE, norm = ELO_NORM):
-    p = [0.0]*(len(rates)+1)
+    p = [0.0]*(len(rates)+2)
     p[0] = 1
 
     for i in range(len(rates)):
         pq = ELO(R, rates[i], base, norm)
         for j in range(i+2):
             p[i+1-j] = p[i+1-j] * (1-pq) + p[i-j] * pq
-    return p
+    return p[:-1]
 
 
 def estimate_p_values(R, rates, N, base = ELO_BASE, norm = ELO_NORM):
@@ -260,10 +259,13 @@ def put_tournament_into_DB(tournamentid, tournament_result, connection):
     connection.comit()           
 
 
-def process_one_tournament(teams_ratings, tournament_result, players_rating, individual_questions = True, question_number = 36, tournament_weight = NON_RATE_DELTA_MULTIPLIER, detailed_print = False) : 
+def process_one_tournament(teams_ratings, tournament_result, players_rating, individual_questions = True, question_number = 36, tournament_weight = NON_RATE_DELTA_MULTIPLIER, players_rated_games_cnt = None, detailed_print = False) : 
+    
+    issues = []
+    
     start_time = datetime.now()
     if detailed_print:
-        print(start_time)
+        print("START TIME:", start_time)
 
     question_gets = {}
     local_teams_rates = []
@@ -294,6 +296,7 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
         if len(pl_rates) == 0:
             print("Team", t["team"]["id"], "has no players")
             player_based_team_ratings[t["team"]["id"]] = None
+            issues.append((t["team"]["id"], "No players data"))
             continue
 
         if len(pl_rates) > 6:
@@ -308,6 +311,7 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
 
         if individual_questions:
             if t["mask"] is None:
+                issues.append((t["team"]["id"], "No individual question data"))
                 if Q_WARN:
                     print("WARNING: No question data")#: " + str(t))
                     Q_WARN = False
@@ -323,14 +327,18 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
                     qid += 1
         else:
             if not "questionsTotal" in t:
+                issues.append((t["team"]["id"], "No question data"))
                 team_gets[t["team"]["id"]] = None
             elif t["questionsTotal"] is None:
                 team_gets[t["team"]["id"]] = None
+                issues.append((t["team"]["id"], "No question data"))
             elif t["questionsTotal"] == 0:
                 if not "position" in t:
                     team_gets[t["team"]["id"]] = None
+                    issues.append((t["team"]["id"], "No question data"))
                 if t["position"] == 9999:
                     team_gets[t["team"]["id"]] = None
+                    issues.append((t["team"]["id"], "No question data"))
             else:
                 team_gets[t["team"]["id"]] = t["questionsTotal"]
                 total_gets += t["questionsTotal"]
@@ -353,11 +361,16 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
         print("Data preparation: " + str(datetime.now() - start_time))
     
     if individual_questions:
+        total_gets = sum([question_gets[x] for x in question_gets])
+        question_number = len(question_gets)
+        Q_hardnes = max_like(1000, local_teams_rates, total_gets/question_number, False)
+    
         for q in range(max_qid):
             question_values.append(max_like(1000, local_teams_rates, question_gets[q], False))
     else:
         qval = max_like(1000, local_teams_rates, total_gets/question_number, False)
         question_values = [qval]*question_number
+        Q_hardnes = qval
 
     
     team_delta = {}
@@ -377,35 +390,66 @@ def process_one_tournament(teams_ratings, tournament_result, players_rating, ind
                 w = w*6 /players_num[tm]
             
             for pl in team_players_id[tm]:
-                player_delta[pl] = team_delta[tm] * w
+                if tournament_weight > NON_RATE_DELTA_MULTIPLIER:
+                    if pl in players_rated_games_cnt:
+                        if players_rated_games_cnt[pl] < 10:
+                            wl = w*10/tournament_weight
+                        elif players_rated_games_cnt[pl] < 20:
+                            wl = w*7/tournament_weight
+                        elif players_rated_games_cnt[pl] < 30:
+                            wl = w*5/tournament_weight
+                        else:
+                            wl = w*3/tournament_weight
+
+                    else:
+                        wl = w*10/tournament_weight
+                else:
+                    wl = w
+                
+                player_delta[pl] = team_delta[tm] * wl
 
     # print("t", team_delta, player_delta)
 
     if detailed_print:
         print("Totaly: " + str(datetime.now() - start_time))
     
-    return (player_based_team_ratings, question_values, player_delta, score)
+    return (player_based_team_ratings, question_values, player_delta, score, Q_hardnes, issues)
 
-def season_to_date(seasone_num):
-    # return(datetime.
-    pass
+def season_to_date_string(seasone_num, for_comparison = False):
+    season_dt = date.fromisoformat("2021-09-02") + timedelta(days=7*seasone_num+int(for_comparison))
+    return season_dt.strftime("%Y-%m-%d")
 
 
-def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
+def season_by_date(datestring) -> int:
+    '''Return season/release id for date. Release 0 boundary is 2021-09-02 23:59:59'''
+    return math.ceil((datetime.fromisoformat(datestring).date() - date.fromisoformat("2021-09-03")).days/7)
 
+
+
+def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 1):
+    
     team_rates = {}
     player_ratings = {}
+    players_rated_games_cnt = {}
     connector = ChGK_API_connector()
+   
     save_data = True
 
     DBconn = sqlite3.connect(r'Output/rating.db')
     cursor = DBconn.cursor()
     
+    if start_from_release > 1:
+        players_rates = cursor.execute(f"SELECT playerid, playerrating FROM playerratings WHERE releaseid = {start_from_release-1}").fetchall()
+        player_ratings = {x[0]:x[1] for x in players_rates}
+        players_rated = cursor.execute(f"SELECT playerid, SUM(maii_rating) FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE tournaments.enddate < '{season_to_date_string(start_from_release-1,  True)}' and maii_rating=1 GROUP BY playerid").fetchall()
+        players_rated_games_cnt = {x[0]:x[1] for x in players_rated}
+    
     print("load cache")
     connector.load_cache("cache.json")
-
+    all_issues = []
 
     print("reading tournaments_info")
+    
     # tournaments_info_list = connector.get_all_rated_tournaments()
  
     with open('tournaments.json', 'r', encoding="utf8") as JSON:
@@ -420,36 +464,31 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
     for t in tournaments_info_list:
         tournament_info_dict[t["id"]] = t
 
-    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if (t["dateEnd"] < "2024-10-11")and(t["type"]["id"] != 5)]
-    # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if t["dateEnd"] < "2021-09-16"]
+    # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if (t["dateEnd"] < "2024-10-11")and(t["type"]["id"] != 5)]
+
+    minimal_end_date = season_to_date_string(start_from_release-1, True)
+
+    ordered_tournament_ids = [t["id"] for t in tournaments_info_list if (t["dateEnd"] < "2024-10-18") and (t["dateEnd"] >= minimal_end_date)]
+    # ordered_tournament_ids = [t["id"] for t in tournaments_info_list if (t["dateEnd"] < "2022-10-11")and(t["type"]["id"] != 5)]
     ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
 
     # force_after = "2024-04-15"
-
     # force_after = "2024-06-15"
 
     force_after = "2024-12-15"
 
     results = {}
-    release_results = {0:{}}
-
+    release_results = {start_from_release-1:{}, start_from_release:{}}
+    release_results[start_from_release-1]["player_ratings"] = deepcopy(player_ratings)
     cnt = 0
 
     # release_date = datetime(year = 2013, month = 9, day = 5) 
-    release_date = datetime(year = 2021, month = 9, day = 2) 
-    release_num = 0
+    release_date = datetime(year = 2021, month = 9, day = 3) + timedelta(days=7*(start_from_release)) 
+    release_num = start_from_release
     tournaments_by_reliases = [[]]
-
-    print_data = False
 
     print_datailes = False
   
-    if print_data:
-        try:
-            os.mkdir(SUB_DIR)
-        except:
-            pass
-
     for t in tqdm(ordered_tournament_ids[:]):
 
         start = datetime.now()
@@ -459,6 +498,7 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
         data = connector.tournament_results(t, tournament_info_dict[t]["dateEnd"] > force_after)
 
         players_names = set()
+        
         for tm in data:
             for pl in tm["teamMembers"]:
                 if not pl["player"]["patronymic"]:
@@ -474,13 +514,22 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
 
 
         while not tournament_info_dict[t]["dateEnd"] < str(release_date):
+            
             for pid in player_ratings:
                 player_ratings[pid] -= RATING_WEEK_DEGRADATION*(player_ratings[pid] - PLAYER_START_RATING)
+            
             records = []
             for tid in tournaments_by_reliases[-1]:
+                
                 for pid in results[tid]["delta_players"]:
-                    player_ratings[pid] += results[tid]["delta_players"][pid]
+                    if tournament_info_dict[t]["type"]["id"] != 5:
+                        player_ratings[pid] += results[tid]["delta_players"][pid]
                     records.append((release_num, pid, results[tid]["delta_players"][pid], tid))
+                    if "maiiRating" in tournament_info_dict[tid]:
+                        if tournament_info_dict[tid]["maiiRating"]:
+                            if not pid in players_rated_games_cnt:
+                                players_rated_games_cnt[pid] = 0
+                            players_rated_games_cnt[pid] += 1
 
             #insert multiple records in a single query
             cursor.executemany('INSERT INTO playerratingsdelta VALUES(?,?,?,?);',records)
@@ -488,13 +537,13 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
             release_results[release_num]["player_ratings"] = deepcopy(player_ratings)
             
             records = []
-            for pid in player_ratings:
-                records.append((release_num, pid, player_ratings[pid]))
+            for place, pid in enumerate(sorted(player_ratings, key=lambda x: -player_ratings[x])):
+                records.append((release_num, pid, player_ratings[pid], place + 1))
                 if not pid in release_results[release_num-1]["player_ratings"]:
-                    records.append((release_num-1, pid, PLAYER_START_RATING))
+                    records.append((release_num-1, pid, PLAYER_START_RATING, None))
 
             #insert multiple records in a single query
-            cursor.executemany('INSERT INTO playerratings VALUES(?,?,?);',records)
+            cursor.executemany('INSERT INTO playerratings VALUES(?,?,?,?);',records)
             
             tournaments_by_reliases.append([])
             release_num += 1
@@ -523,20 +572,11 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
         else:
             tournament_weight = NON_RATE_DELTA_MULTIPLIER
             
-        delta, qv, delta_pl, score = process_one_tournament(team_rates, data, player_ratings, individual, questionQty, tournament_weight)
+        delta, qv, delta_pl, score, Q_hardnes, issues = process_one_tournament(team_rates, data, player_ratings, individual, questionQty, tournament_weight, players_rated_games_cnt)
 
-        if print_data:
-            team_places = sorted([x for x in delta], key = lambda x: -delta[x])
-            fname = SUB_DIR + "/" + str(release_num)+"_"+str(t)+".csv"
-            f = open(fname, "w", encoding="utf-8")
-            bytes = f.write("Команда; рейтинг; число игроков; место; ожидаемое место; взято вопросов; ожидаемое число взятых вопросов\n")
-            for my_t in data:
-                if (not (my_t["mask"] == None)) |  (not (my_t["questionsTotal"] == None)):
-                    if my_t["team"]["id"] in delta:
-                        bytes = f.write(my_t["current"]["name"] + "; " +str(delta[my_t["team"]["id"]])+ "; " +str(len(my_t["teamMembers"])) +"; "+ str(my_t["position"]) + "; " + str(team_places.index(my_t["team"]["id"])+1)+"; " + str(my_t["questionsTotal"]) + "; " + str(ELO_estimate(delta[my_t["team"]["id"]], qv))+"\n")
-            f.close()
-        
-        
+        all_issues += [(t, a, b) for a, b in issues]
+
+
         if save_data:
             q_diff = []
             q2_diff = []
@@ -576,7 +616,8 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
         cursor.executemany('INSERT INTO results VALUES(?,?,?,?,?,?);',results_data)        
         cursor.executemany('INSERT INTO tournaments_legs VALUES(?,?,?,?,?,?,?,?,?);',legs_data)        
         
-        cursor.execute("INSERT INTO tournaments VALUES(?,?,?,?,?,?);", (tournament_info_dict[t]["id"],tournament_info_dict[t]["name"], tournament_info_dict[t]["dateStart"],tournament_info_dict[t]["dateEnd"], tournament_info_dict[t]["type"]["name"], tournament_info_dict[t]["type"]["id"]))
+        # print(tournament_info_dict[t])
+        cursor.execute("INSERT OR REPLACE INTO tournaments VALUES(?,?,?,?,?,?,?,?,?);", (tournament_info_dict[t]["id"],tournament_info_dict[t]["name"], tournament_info_dict[t]["dateStart"],tournament_info_dict[t]["dateEnd"], tournament_info_dict[t]["type"]["id"], tournament_info_dict[t]["type"]["name"], tournament_info_dict[t]["maiiRating"], Q_hardnes, tournament_info_dict[t]["longName"]))
 
         results[t] = {}
         results[t]["qv"] = qv
@@ -611,20 +652,28 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
     release_results[release_num]["player_ratings"] = deepcopy(player_ratings)
     
     records = []
-    for pid in player_ratings:
-        records.append((release_num, pid, player_ratings[pid]))
+    for place, pid in enumerate(sorted(player_ratings, key=lambda x: -player_ratings[x])):
+        records.append((release_num, pid, player_ratings[pid], place+1))
         if not pid in release_results[release_num-1]["player_ratings"]:
-            records.append((release_num-1, pid, PLAYER_START_RATING))
+            records.append((release_num-1, pid, PLAYER_START_RATING, None))
 
 
-    cursor.executemany('INSERT INTO playerratings VALUES(?,?,?);',records)
+    cursor.executemany('INSERT INTO playerratings VALUES(?,?,?,?);',records)
 
     DBconn.commit()
     DBconn.close()
 
-    print("Save chach. Be patient")
     
-    connector.save_cache("cache.json")
+    #Предполагаем, что кэш больше не обновляется, все его изиенения в отдельных процессах/блоках
+    #print("Save chach. Be patient")
+    
+    #connector.save_cache("cache.json")
+
+
+    with open("issues.json", "w") as file:
+        json.dump(all_issues, file)
+
+    
     # connector.save_cache("cache_large.json")
     # print("Done")
     ## Models comparison
@@ -666,27 +715,28 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 0):
 
 
 
-def clear_db():
+def clear_db(start_from_release = 0):
     #try to clear all data
     conn = sqlite3.connect(r'Output/rating.db')
-    try:
-        conn.executescript('''
-        CREATE TABLE tournaments ( tournamentid integer primary key, name varchar(255), startdate date, enddate date, typeoft_id INTEGER, type TEXT); 
-        CREATE TABLE roster ( tournamentid integer, playerid integer, teamid integer ); 
-        CREATE TABLE results ( tournamentid integer, teamid integer, place real, totalquestions integer, mask varchar(255), teamname varchar(255));
-        CREATE TABLE releases ( releaseid integer primary key, relisdate date);
-        CREATE TABLE playerratings ( releaseid integer, playerid integer, playerrating real);
-        CREATE TABLE playerratingsdelta ( releaseid integer, playerid integer, deltarating real, tournamentid integer);
-        CREATE TABLE tournamentratings ( tournamentid integer, teamid integer, teamrating real, teamperformance real, predictedquestions real, atleastprob real, atmostprob real);
-        CREATE TABLE players ( playerid integer primary key, name varchar(255), surname varchar(255), patronim varchar(255), fullname varchar(255));
-        CREATE TABLE questionrating ( tournamentid int, questionid int, hardnes real);
-        CREATE TABLE teams ( teamid integer primary key, teamname varchar(255));
-        CREATE TABLE tournaments_legs (tournamentid integer, teamid integer, leg integer, legsize integer, mask varchar(255), legquestions integer, predictedquestions real, atleastprob real, atmostprob real); 
-''')
-        conn.close()  
-    except Exception:
-        print("DB exists?")
-        cursor = conn.cursor()
+#     try:
+#         conn.executescript('''
+#         CREATE TABLE tournaments ( tournamentid integer primary key, name varchar(255), startdate date, enddate date, typeoft_id INTEGER, type TEXT); 
+#         CREATE TABLE roster ( tournamentid integer, playerid integer, teamid integer ); 
+#         CREATE TABLE results ( tournamentid integer, teamid integer, place real, totalquestions integer, mask varchar(255), teamname varchar(255));
+#         CREATE TABLE releases ( releaseid integer primary key, relisdate date);
+#         CREATE TABLE playerratings ( releaseid integer, playerid integer, playerrating real, place integer);
+#         CREATE TABLE playerratingsdelta ( releaseid integer, playerid integer, deltarating real, tournamentid integer);
+#         CREATE TABLE tournamentratings ( tournamentid integer, teamid integer, teamrating real, teamperformance real, predictedquestions real, atleastprob real, atmostprob real);
+#         CREATE TABLE players ( playerid integer primary key, name varchar(255), surname varchar(255), patronim varchar(255), fullname varchar(255));
+#         CREATE TABLE questionrating ( tournamentid int, questionid int, hardnes real);
+#         CREATE TABLE teams ( teamid integer primary key, teamname varchar(255));
+#         CREATE TABLE tournaments_legs (tournamentid integer, teamid integer, leg integer, legsize integer, mask varchar(255), legquestions integer, predictedquestions real, atleastprob real, atmostprob real); 
+# ''')
+#         conn.close()  
+#     except Exception:
+        # print("DB exists?")
+    cursor = conn.cursor()
+    if start_from_release == 0:
         cursor.execute('DELETE FROM tournaments;')
         cursor.execute('DELETE FROM roster;')
         cursor.execute('DELETE FROM results;')
@@ -698,10 +748,19 @@ def clear_db():
         cursor.execute('DELETE FROM questionrating;')
         cursor.execute('DELETE FROM teams;')
         cursor.execute('DELETE FROM tournaments_legs;')
-        conn.commit()
-        conn.close()   
+    else:
+        cursor.execute(f'DELETE FROM playerratings WHERE releaseid >= {start_from_release};')
+        cursor.execute(f'DELETE FROM playerratingsdelta WHERE ROWID IN (SELECT playerratingsdelta.ROWID FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
+        cursor.execute(f'DELETE FROM roster WHERE ROWID IN (SELECT roster.ROWID FROM roster JOIN tournaments ON roster.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
+        cursor.execute(f'DELETE FROM tournamentratings WHERE ROWID IN (SELECT tournamentratings.ROWID FROM tournamentratings JOIN tournaments ON tournamentratings.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
+        cursor.execute(f'DELETE FROM questionrating WHERE ROWID IN (SELECT questionrating.ROWID FROM questionrating JOIN tournaments ON questionrating.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
+        cursor.execute(f'DELETE FROM results WHERE ROWID IN (SELECT results.ROWID FROM results JOIN tournaments ON results.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
+
+    conn.commit()
+    conn.close()
+
 
 
 if __name__ == "__main__":
-    clear_db()
-    process_all_data(start_from_release = 130)
+    clear_db(start_from_release = 0)
+    process_all_data(start_from_release = 0)
