@@ -93,7 +93,10 @@ def showPlayerInfo(playerid):
     conn = get_db_connection()
     ts = time.time()
     # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
-    deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid AND playerratingsdelta.playerid = '+str(playerid)+' JOIN roster ON playerratingsdelta.tournamentid=roster.tournamentid AND roster.playerid = '+str(playerid)+' JOIN results ON playerratingsdelta.tournamentid=results.tournamentid AND roster.teamid=results.teamid ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    deltas = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN results ON playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid').fetchall()# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    # print([x["releaseid"] for x in deltas]  )
+    deltas.sort(key=lambda x: -x["releaseid"])
+    
     ts1 = time.time()
     # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid JOIN roster ON tournaments.tournamentid=roster.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
     ratings = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
