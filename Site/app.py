@@ -285,6 +285,10 @@ def showNevermore():
 def showNevermore2():
     return render_template("nevermore2405.html")
 
+@app.route("/predict/gostinydvor", subdomain="rating")
+@app.route("/predict/10707", subdomain="rating")
+def showGD():
+    return render_template("10707.html")
 
 @app.route("/predict/nesova2024", subdomain="rating")
 @app.route("/nesova2024", subdomain="rating")
