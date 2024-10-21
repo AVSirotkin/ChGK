@@ -4,9 +4,14 @@
 <script type='text/javascript'> function my_show(teamid, tournamentid) {fetch("/teams/"+teamid+"/"+tournamentid /*, options */)
   .then((response) => response.text())
   .then((html) => {
-      document.getElementById("roster"+teamid).innerHTML = html;
+      document.getElementById("roster"+teamid).innerHTML = html + "<br> <div onclick='my_hide("+teamid+")'>(скрыть)</div>";
   })
   }
+
+	function my_hide(teamid) {
+      document.getElementById("roster"+teamid).innerHTML = "<div onclick='my_show("+teamid+", {{tournamentid}})'>(состав)</div>" 
+    }
+
   function all_my_show(teamid, tournamentid) {
   
   fetch("../legs_info/"+tournamentid+"/"+teamid+"?field=atmostprob")
