@@ -329,17 +329,20 @@ def showAllTournaments():
 
 def read_cfg():
     website_url = ""
+    port = 80
     try:
         with open("site.cfg") as cfg_file:
             website_url = cfg_file.readline().strip()
+            port = int(cfg_file.readline().strip())
     except Exception:
         pass    
     if website_url == "":
-        website_url = 'chgk.fun'
-    return website_url
+        website_url = 'chgk.test'
+        port = 80
+    return website_url, port
 
 if __name__ == "__main__":
-    website_url = read_cfg()
+    website_url, port = read_cfg()
     print(website_url)
     app.config['SERVER_NAME'] = website_url
-    app.run(debug=True, port=80)
+    app.run(debug=True, port=port)
