@@ -102,7 +102,11 @@ def showPlayerInfo(playerid):
     ratings = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
     # ratings = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)).fetchall()
     ts2 = time.time()
-    playername = conn.execute('SELECT fullname from players WHERE playerid='+str(playerid)).fetchone()["fullname"]
+    playername_req = conn.execute('SELECT fullname from players WHERE playerid='+str(playerid)).fetchone()
+    if playername_req is None:
+        playername = "Нет данных"
+    else:
+        playername = playername_req["fullname"]
     conn.close()
     print("deltas", ts1 - ts, "ratings", ts2-ts1)
     rate_list = []
@@ -299,7 +303,11 @@ def showCompare():
 @app.route("/teams/<int:teamid>", subdomain="rating")
 def showTeamInfo(teamid):
     conn = get_db_connection()
-    team_name = conn.execute(f'SELECT teamname FROM teams WHERE teamid = {teamid}').fetchone()["teamname"]
+    team_name = conn.execute(f'SELECT teamname FROM teams WHERE teamid = {teamid}').fetchone()
+    if team_name is None:
+        team_name = ""
+    else:
+        team_name = team_name["teamname"]
     tournaments = conn.execute('SELECT * FROM results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' + 
     ' JOIN tournaments ON results.tournamentid=tournaments.tournamentid' + 

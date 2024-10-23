@@ -43,12 +43,7 @@
           <td>{{ tourresult.place }}</td>
           <td><a href="/teams/{{ tourresult.teamid }}"> {{ tourresult.teamname }}</a><div id="roster{{tourresult.teamid}}"> <div onclick="my_show({{tourresult.teamid}}, {{tournamentid}})">(состав)</div></div></td>
           <td>{{ "%.2f"|format(tourresult.teamrating) }}</a></td>
-          <!-- <td>{{ "%.2f"|format(tourresult.teamperformance) }}</a></td> -->
-          <!-- <td>{{ tourresult.totalquestions }}<div id="legquestions{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td> -->
           <td>{{ "%.2f"|format(tourresult.predictedquestions) }} <div id="predictedquestions{{tourresult.teamid}}"> <!-- <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div> --></div></td>
-          <!-- <td>{{ "%.2f"|format(tourresult.totalquestions - tourresult.predictedquestions) }}</td> -->
-          <!-- <td>{{ "%.2f"|format(tourresult.atleastprob*100)}}% <div id="atleastprob{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td> -->
-          <!-- <td>{{ "%.2f"|format(tourresult.atmostprob*100)}}% <div id="atmostprob{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td> -->
         </tr>
       {% endfor %}
     </tbody>

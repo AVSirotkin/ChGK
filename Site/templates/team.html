@@ -41,13 +41,13 @@
       {% for tourresult in tourresults %}
         <tr>
           <td><a href="/tournament/{{ tourresult.tournamentid }}"> {{ tourresult.name }}</a><div id="roster{{tourresult.tournamentid}}", onclick="my_show({{teamid}}, {{tourresult.tournamentid}})">(состав)</div></td>
-          <td>{{ tourresult.place }}</td>
+          <td>{{ tourresult.place if tourresult.place is not none else "Нет данных"}}</td>
           <td>{{ "%.2f"|format(tourresult.teamrating) }} </td>
-          <td>{{ tourresult.totalquestions }}</td>
-          <td>{{ "%.2f"|format(tourresult.predictedquestions) }}</td>
-          <td>{{ "%.2f"|format(tourresult.totalquestions - tourresult.predictedquestions) }}</td>
-          <td>{{ "%.2f"|format(tourresult.atleastprob*100)}}%</td>
-          <td>{{ "%.2f"|format(tourresult.atmostprob*100)}}%</td>
+          <td>{{ tourresult.totalquestions if tourresult.totalquestions is not none else "Нет данных" }}</td>
+          <td>{{ "%.2f"|format(tourresult.predictedquestions) }} <div id="predictedquestions{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td>
+          <td>{{ "%.2f"|format(tourresult.totalquestions - tourresult.predictedquestions) if (tourresult.totalquestions is not none)and(tourresult.predictedquestions) }}</td>
+          <td>{{ "{0:0.2f}%".format(tourresult.atleastprob*100) if (tourresult.atleastprob is not none)}} <div id="atleastprob{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td>
+          <td>{{ "{0:0.2f}%".format(tourresult.atmostprob*100) if (tourresult.atmostprob is not none)}}<div id="atmostprob{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td>
         </tr>
       {% endfor %}
     </tbody>
