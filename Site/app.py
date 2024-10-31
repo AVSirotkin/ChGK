@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 
 def get_db_connection():
-    conn = sqlite3.connect('Output/rating.db')
+    conn = sqlite3.connect('Output/rating_for_site.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -354,3 +354,4 @@ if __name__ == "__main__":
     print(website_url)
     app.config['SERVER_NAME'] = website_url
     app.run(debug=True, port=port)
+    
