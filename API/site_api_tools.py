@@ -8,6 +8,7 @@
 BASE_CHGK_API_URL = "https://api.rating.chgk.net"
 
 import json
+import pickle as pickle
 import requests
 import os.path
 from datetime import datetime
@@ -23,15 +24,23 @@ class ChGK_API_connector:
         if use_cache:
             self.API_cache = {"tournament_results":{}, "player_info":{}}
     
-    def save_cache(self, file_name):
-        with open(file_name, "w") as file:
-            json.dump(self.API_cache, file)
+    def save_cache(self, file_name, to_pickle = True):
+        if to_pickle:
+            with open(file_name, "wb") as file:
+                pickle.dump(self.API_cache, file)
+        else:
+            with open(file_name, "w") as file:
+                json.dump(self.API_cache, file)
 
-    def load_cache(self, filename):
+    def load_cache(self, filename, from_pickle = True):
         if not os.path.exists(filename):
             return
-        with open(filename, 'r') as JSON:
-            self.API_cache = json.load(JSON)
+        if from_pickle:
+            with open(filename, 'rb') as file:
+                self.API_cache = pickle.load(file)
+        else:
+            with open(filename, 'r') as file:
+                self.API_cache = json.load(file)
 
     def get_all_tournaments_id_for_team(self, team_id):
         r = requests.get(BASE_CHGK_API_URL+"/teams/"+str(team_id)+"/tournaments?page=1&itemsPerPage=0&pagination=false", headers={'accept': 'application/json'})
@@ -89,13 +98,16 @@ class ChGK_API_connector:
             next = (len(infoA)==500)
         return res
  
-    def get_all_tournaments(self, page = 1, startdate_after = ""):
+    def get_all_tournaments(self, page = 1, startdate_after = "", last_edit_date = ""):
         res = []
         next = True
         if len(startdate_after) > 0:
             suffix = "&dateStart[after]="+startdate_after
         else:
             suffix = ''
+        if len(last_edit_date):
+            suffix += "&lastEditDate[after]="+last_edit_date
+
         while next:
             print(datetime.now(), BASE_CHGK_API_URL+"/tournaments?page="+str(page)+"&itemsPerPage=100"+suffix)
             try:
@@ -120,7 +132,7 @@ class ChGK_API_connector:
         while retry:
             retry -= 1
             try:
-                results = requests.get("https://api.rating.chgk.net/tournaments/"+str(idtournament)+"/results?includeTeamMembers=1&includeMasksAndControversials=1&includeTeamFlags=0&includeRatingB=1", headers={'accept': 'application/json'}).json()
+                results = requests.get("https://api.rating.chgk.net/tournaments/"+str(idtournament)+"/results?includeTeamMembers=1&includeMasksAndControversials=1&includeTeamFlags=1&includeRatingB=1", headers={'accept': 'application/json'}).json()
             except:
                 print("retry attempt in 5 seconds")
                 time.sleep(5)
