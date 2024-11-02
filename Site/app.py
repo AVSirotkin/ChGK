@@ -231,7 +231,7 @@ def showTeamTournamentInfo(teamid, tournamentid, return_html = True):
 
 @app.route("/predict/<int:tournamentid>", subdomain="rating")
 def showPregeneratedPrediction(tournamentid):
-    if os.path.isfile(f"Site/templates/predicti]ons/{tournamentid}.html"): 
+    if os.path.isfile(f"Site/templates/predictions/{tournamentid}.html"): 
         return render_template(f"predictions/{tournamentid}.html")
     else:
         return "Прогноза для турнира "+str(tournamentid)+" не найдено"
