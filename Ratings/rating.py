@@ -189,13 +189,13 @@ def put_tournament_into_DB(tournamentid, tournament_result, connection):
     connection.commit()           
 
 
-def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_questions = True, question_number = 36, tournament_weight = NON_RATE_DELTA_MULTIPLIER, players_rated_games_cnt = None, detailed_print = False, print_issues = True) : 
+def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_questions = True, question_number = 36, tournament_weight = NON_RATE_DELTA_MULTIPLIER, players_rated_games_cnt = None, detailed_print = False, print_issues = False) : 
     
     issues = []
     start_time = datetime.now()
     if detailed_print:
         print("START TIME:", start_time, tournamentid)
-
+    logger.debug(f"Process {tournamentid}")
     question_gets = {}
     question_attempts = {}
     local_teams_rates = []
@@ -233,6 +233,9 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
     team_results_sql = DB.execute(f"SELECT teamid, totalquestions, mask, place FROM results WHERE tournamentid =={tournamentid}").fetchall()
     # print("res:", team_results_sql)
     for tm in team_results_sql:
+        if not tm[0] in player_based_team_ratings:
+            player_based_team_ratings[tm[0]] = None
+            continue
         # print(tm)
         if individual_questions:
             if tm[2] is None:
@@ -272,7 +275,7 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
                 team_gets[tm[0]] = tm[1]
                 total_gets += tm[1]
     # print("tg", team_gets)
-    local_teams_rates = [player_based_team_ratings[tid] for tid in player_based_team_ratings]
+    local_teams_rates = [player_based_team_ratings[tid] for tid in player_based_team_ratings if not player_based_team_ratings[tid] is None]
     
     score = {}
     if detailed_print:
@@ -585,8 +588,10 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 1):
 
 
     minimal_end_date = season_to_date_string(start_from_release-1, True)
+    actual_release = season_by_datetime(datetime.now())
+    max_end_data = season_to_date_string(actual_release + 1, True)
 
-    ordered_tournament_ids = [t for t in tournament_info_dict if (tournament_info_dict[t]["dateEnd"] < "2024-11-08") and (tournament_info_dict[t]["dateEnd"] >= minimal_end_date)and(tournament_info_dict[t]["type"]["id"] != 5)]
+    ordered_tournament_ids = [t for t in tournament_info_dict if (tournament_info_dict[t]["dateEnd"] < max_end_data) and (tournament_info_dict[t]["dateEnd"] >= minimal_end_date)and(tournament_info_dict[t]["type"]["id"] != 5)]
     ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
 
     # results = {}
@@ -956,13 +961,17 @@ def update_tournaments():
         rs = connector.tournament_results(t["id"], True)
         put_tournament_into_DB(t["id"], rs, conn)
         tournaments_info_dict[str(t["id"])] = t
-    ordered_changes = sorted([(x["id"], x["name"], x["lastEditDate"], x["dateEnd"]) for x in test_new if x["dateEnd"] < "2024-11-01"], key=lambda x: x[3])  
-    print("Earliest updated tournament", ordered_changes[0])
+    ordered_changes = sorted([(x["id"], x["name"], x["lastEditDate"], x["dateEnd"]) for x in test_new], key=lambda x: x[3])  
+    if len(ordered_changes) > 0:
+        print("Earliest updated tournament", ordered_changes[0])
+        datestr = ordered_changes[0][3]
+        earliest_release = season_by_datestring(datestr)
+    else:
+        earliest_release = season_by_datetime(datetime.now())
+
     # connector.save_cache("cache.pickle", to_pickle=True)
     with open("tournaments_info.json", "w") as file:
         json.dump(tournaments_info_dict, file)
-    datestr = ordered_changes[0][3]
-    earliest_release = season_by_datestring(datestr)
     logging.info("Tournament update finished")
     conn.close()
     return(earliest_release)
@@ -991,7 +1000,8 @@ def update_team_ratings(actual_release = 0):
 # @profile
 def main():
     FORMAT = '%(asctime)s %(message)s'
-    logging.basicConfig(level=logging.INFO, format = FORMAT)
+    logging.basicConfig(level=logging.DEBUG, format = FORMAT)
+    logger.info("Start rating estimation")
 
     actual_release = season_by_datetime(datetime.now())
     start_from_release = update_tournaments()
