@@ -1014,10 +1014,18 @@ def main():
 
     logging.info("base copy start")
     try:
-        shutil.copyfile('Output/rating.db', 'Output/rating_for_site.db')
+        shutil.copyfile('Output/rating.db', 'Output/rating_for_site_copy.db')
     except Exception:
-        shutil.copyfile('Output/rating.db', 'Output/rating_for_site.db')
+        shutil.copyfile('Output/rating.db', 'Output/rating_for_site_copy.db')
     logging.info("base copy finished")
+    logging.info("start move")
+    if os.path.isfile("Output/rating_for_site_copy.db"):
+        try:
+            shutil.move("Output/rating_for_site_copy.db", "Output/rating_for_site.db")
+        except Exception:
+            pass
+        
+    logging.info("move finished")
     
 
 
