@@ -22,6 +22,7 @@ from memory_profiler import profile
 MIN_QUESTION_RATING = 0
 MAX_QUESTION_RATING = 10000
 DELTA_MULTIPLIER = 3
+# NON_RATE_DELTA_MULTIPLIER = 3
 NON_RATE_DELTA_MULTIPLIER = 0.1
 INDEPNDENT_SKILL_QUESTION = 2000
 PLAYER_START_RATING = 1000
@@ -692,12 +693,35 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 1):
 
             individual  = any(fulldata)
 
-        if tournament_info_dict[t]["maiiRating"]:
-            tournament_weight = DELTA_MULTIPLIER
-            rated = 1
+
+
+
+        # if tournament_info_dict[t]["maiiRating"]:
+        #     tournament_weight = DELTA_MULTIPLIER
+        #     rated = 1
+        # else:
+        #     tournament_weight = NON_RATE_DELTA_MULTIPLIER
+        #     rated = 0
+
+        if tournament_info_dict[t]["type"]["id"] in [2, 3, 6, 8, 4]:
+            if not "questionQty" in tournament_info_dict[t]:
+                tournament_weight = NON_RATE_DELTA_MULTIPLIER
+                rated = 0
+            else:
+                tq = sum(tournament_info_dict[t]["questionQty"][qq] for qq in tournament_info_dict[t]["questionQty"])
+                if tq > 150:
+                    tournament_weight = NON_RATE_DELTA_MULTIPLIER
+                    rated = 0
+                else:
+                    tournament_weight = DELTA_MULTIPLIER
+                    rated = 1
+                        
         else:
             tournament_weight = NON_RATE_DELTA_MULTIPLIER
             rated = 0
+    
+ 
+
 
         if from_DB:
             delta, qv, delta_pl, score, Q_hardnes, issues = process_one_tournament_from_DB(DBconn, t, player_ratings, True, questionQty, tournament_weight, players_rated_games_cnt)
@@ -940,6 +964,8 @@ def clear_db(start_from_release = 0, only_rates = True):
         cursor.execute(f'DELETE FROM tournamentratings WHERE ROWID IN (SELECT tournamentratings.ROWID FROM tournamentratings JOIN tournaments ON tournamentratings.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
         logging.info("    questionrating")        
         cursor.execute(f'DELETE FROM questionrating WHERE ROWID IN (SELECT questionrating.ROWID FROM questionrating JOIN tournaments ON questionrating.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
+        logging.info("    tournaments_legs")        
+        cursor.execute(f'DELETE FROM tournaments_legs WHERE ROWID IN (SELECT tournaments_legs.ROWID FROM tournaments_legs JOIN tournaments ON tournaments_legs.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
 
     conn.commit()
     conn.close()
@@ -1005,7 +1031,7 @@ def main():
 
     actual_release = season_by_datetime(datetime.now())
     start_from_release = update_tournaments()
-    # start_from_release = 0
+    start_from_release = 0
     clear_db(start_from_release = start_from_release)
     process_all_data(start_from_release = start_from_release)
     update_team_ratings(actual_release)
