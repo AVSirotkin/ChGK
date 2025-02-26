@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<script src="https://cdn.plot.ly/plotly-3.0.0.min.js" charset="utf-8"></script>
+
+<script>
+    function show_all(){
+        // var sel.options[sel.selectedIndex].text
+        console.log("click")
+        // console.log(document.document.getElementById('result_tr'))
+        var el = document.getElementsByClassName('result_tr')
+        // console.log(el)
+        for (var i = 0, ilen = el.length - 1; i < ilen; i++) {
+        el[i].style.display = 'table-row';
+        }
+          
+   }
+</script>
+
+
+<script>
+   function player_line_info(player_data) {
+// we assume that data is sorted correctly
+      console.log(player_data)
+      var graph_data = {}
+      // console.log(player_data.rates)
+      graph_data.x = player_data.rates.map((element) => element.releaseid);
+      graph_data.y = player_data.rates.map((element) => element.playerrating);
+      graph_data.name = player_data.player.fullname
+      graph_data.text = []
+      last = 0
+      t = ""
+      for(g of player_data.deltas){
+         if (g.releaseid < graph_data.x[last]){
+            while (g.releaseid < graph_data.x[last]){
+               graph_data.text.push(t)
+               last += 1
+               t = ""
+            }
+         }
+         if (g.deltarating === null) {t += "Нет данных: " + g.name + "<br>"}
+         else {t += g.deltarating.toFixed(2)+": " + g.name + "<br>"}
+      }
+
+      return graph_data;
+   }
+
+
+
+
+   var player_data = [{{player_json|safe}}]
+
+
+</script>
+
+
+<div id="player_plot"></div>
+
+
+<script>
+    function my_draw(){
+    TESTER = document.getElementById('player_plot');
+   //  console.log(TESTER)
+    var draw_data = player_data.map((pd) => player_line_info(pd))
+    console.log(draw_data)
+    Plotly.newPlot(TESTER, draw_data, {
+    hovermode:'x unified', 
+    margin: { t: 25 } });
+
+   }
+   document.onload=my_draw()
+
+   async function add_player_info(){
+      
+
+      let ans = await fetch("/api/player/"+document.getElementById("playerid").value+"/full")
+
+      if (ans.ok) { // если HTTP-статус в диапазоне 200-299
+      // получаем тело ответа (см. про этот метод ниже)
+      let json = await ans.json();
+      player_data.push(json)
+      } else {
+      alert("Ошибка HTTP: " + ans.status);
+      }
+      my_draw()
+   }
+
+
+</script>
+
+<!-- <button onclick="my_draw()">Рисовать</button> -->
+
+<input id="playerid"></input>
+<button onclick="add_player_info()">Добавить игрока</button>  
+
+{% endblock %}
