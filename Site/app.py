@@ -162,7 +162,7 @@ def showPlayerInfo(playerid):
     else:
         playername = playername_req["fullname"]
     conn.close()
-    deltas, ratings = PlayerDetailedRates(playerid, False)
+    deltas, ratings, playerinfo = PlayerDetailedRates(playerid, False)
     # print("deltas", ts1 - ts, "ratings", ts2-ts1)
     rate_list = []
     deltas_idx = 0
@@ -185,7 +185,7 @@ def showPlayerInfo(playerid):
 @app.route("/compareplayers/<int:playerid>", subdomain="rating")
 def showComparePlayerInfo(playerid):
     player_json = PlayerDetailedRates(playerid, True)
-    print(player_json)
+    # print(player_json)
     return render_template("compareplayers.html", player_json = player_json, playerid=playerid)
 
 
@@ -225,8 +225,8 @@ def showFullTournamentInfo(tournamentid):
     # ' ORDER BY place'
     ).fetchall()
     # print(tuple(tournaments[0]))
-    print(tournaments[0].keys())
-    print(tournaments[0]['teamid'])
+    # print(tournaments[0].keys())
+    # print(tournaments[0]['teamid'])
     conn.close()
     return render_template("tournament_full.html", tourresults=tournaments)
 
