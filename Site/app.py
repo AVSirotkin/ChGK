@@ -67,6 +67,27 @@ def PlayerRates(playerid):
     ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC')
     return json.dumps({x["releaseid"]:x["playerrating"] for x in ratings})
 
+@app.route('/api/tournamentteamresult/<int:tournamentid>/<int:teamid>', subdomain="rating")
+def TeamResult(tournamentid, teamid):
+    conn = get_db_connection()
+    res = conn.execute(f'SELECT * FROM results WHERE tournamentid = {tournamentid} and teamid = {teamid}').fetchone()
+    if res is None:
+        return {}
+    return json.dumps(dict(res))
+
+@app.route('/api/tournamentteamrates/<int:tournamentid>/<int:teamid>', subdomain="rating")
+def TeamRates(tournamentid, teamid):
+    conn = get_db_connection()
+    res = conn.execute(f'SELECT * FROM tournamentratings WHERE tournamentid = {tournamentid} and teamid = {teamid}').fetchone()
+    if res is None:
+        return {}
+    return json.dumps(dict(res))
+
+
+@app.route('/teamshow/<int:tournamentid>/<int:teamid>', subdomain="rating")
+def TeamShow(tournamentid, teamid):
+    return render_template("teamshow.html", tournamentid=tournamentid, teamid = teamid)
+
 
 @app.route('/api/player/<int:playerid>/full', subdomain="rating")
 def PlayerDetailedRates(playerid, return_json = True):
