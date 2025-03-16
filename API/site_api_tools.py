@@ -5,7 +5,7 @@
 
 #TODO: Handle server response error
 
-BASE_CHGK_API_URL = "https://api.rating.chgk.net"
+BASE_CHGK_API_URL = "https://api.rating.chgk.info"
 
 import json
 import pickle as pickle
@@ -116,10 +116,50 @@ class ChGK_API_connector:
                 print("someting BAD!!! We will wait 5 seconds and retry")
                 time.sleep(5)
             else:
-                infoA = r.json()
-                res += infoA
-                page += 1
-                next = (len(infoA)==100)
+                if r.status_code == 200:
+                    infoA = r.json()
+                    res += infoA
+                    page += 1
+                    next = (len(infoA)==100)
+                else:
+                    if r.status_code == 500:
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-9)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-8)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-7)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-6)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-5)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-4)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-3)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-2)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-1)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
+                        infoA = r.json()
+                        res += infoA
+                        page += 1
+
+                        next = True
+
+                    print(f"bad respose code {r.status_code}")
+                    time.sleep(5)
+
         return res
 
     def tournament_results(self, idtournament, forced = False, quiet = True, max_attempt = 10):
@@ -132,12 +172,17 @@ class ChGK_API_connector:
         while retry:
             retry -= 1
             try:
-                results = requests.get("https://api.rating.chgk.net/tournaments/"+str(idtournament)+"/results?includeTeamMembers=1&includeMasksAndControversials=1&includeTeamFlags=1&includeRatingB=1", headers={'accept': 'application/json'}).json()
+                r = requests.get(BASE_CHGK_API_URL + "/tournaments/"+str(idtournament)+"/results?includeTeamMembers=1&includeMasksAndControversials=1&includeTeamFlags=1&includeRatingB=1", headers={'accept': 'application/json'})
             except:
                 print("retry attempt in 5 seconds")
                 time.sleep(5)
             else:
-                retry = 0
+                if r.status_code == 200:
+                    results = r.json()
+                    retry = 0
+                else:
+                    print(f"retry attempt in 5 seconds due bad response code {r.status_code}")
+                    time.sleep(5)
 
 
         if self.use_cache:
@@ -149,11 +194,15 @@ class ChGK_API_connector:
         if self.use_cache and not forced:
             if str(idplayer) in self.API_cache["player_info"]:
                 return self.API_cache["player_info"][str(idplayer)]
-        results = requests.get("https://api.rating.chgk.net/players/"+str(idplayer), headers={'accept': 'application/json'}
+        results = requests.get(BASE_CHGK_API_URL+"/players/"+str(idplayer), headers={'accept': 'application/json'}
 ).json()
         if self.use_cache:
             self.API_cache["player_info"][str(idplayer)] = results
         return results
 
+    def get_venue_info(self, venueid):
+        results = requests.get(BASE_CHGK_API_URL+"/venues/"+str(venueid), headers={'accept': 'application/json'}
+).json()
+        return results
 
   
