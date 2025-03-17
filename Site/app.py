@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 
 def get_db_connection():
-    conn = sqlite3.connect('Output/rating_for_site.db')
+    conn = sqlite3.connect('file:Output/rating_for_site.db?immutable=1', uri=True)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -83,6 +83,13 @@ def TeamRates(tournamentid, teamid):
         return {}
     return json.dumps(dict(res))
 
+@app.route('/api/tournamentteamrates/<int:tournamentid>', subdomain="rating")
+def AllTeamRates(tournamentid):
+    conn = get_db_connection()
+    res = conn.execute(f'SELECT * FROM tournamentratings WHERE tournamentid = {tournamentid}')
+    if res is None:
+        return {}
+    return json.dumps([dict(r) for r in res])
 
 @app.route('/teamshow/<int:tournamentid>/<int:teamid>', subdomain="rating")
 def TeamShow(tournamentid, teamid):
@@ -454,5 +461,7 @@ if __name__ == "__main__":
     website_url, port = read_cfg()
     print(website_url)
     app.config['SERVER_NAME'] = website_url
+    
+    
     app.run(debug=True, port=port)
     
