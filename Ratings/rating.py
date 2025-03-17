@@ -696,29 +696,29 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 1):
 
 
 
-        # if tournament_info_dict[t]["maiiRating"]:
-        #     tournament_weight = DELTA_MULTIPLIER
-        #     rated = 1
-        # else:
-        #     tournament_weight = NON_RATE_DELTA_MULTIPLIER
-        #     rated = 0
-
-        if tournament_info_dict[t]["type"]["id"] in [2, 3, 6, 8, 4]:
-            if not "questionQty" in tournament_info_dict[t]:
-                tournament_weight = NON_RATE_DELTA_MULTIPLIER
-                rated = 0
-            else:
-                tq = sum(tournament_info_dict[t]["questionQty"][qq] for qq in tournament_info_dict[t]["questionQty"])
-                if tq > 150:
-                    tournament_weight = NON_RATE_DELTA_MULTIPLIER
-                    rated = 0
-                else:
-                    tournament_weight = DELTA_MULTIPLIER
-                    rated = 1
-                        
+        if tournament_info_dict[t]["maiiRating"]:
+            tournament_weight = DELTA_MULTIPLIER
+            rated = 1
         else:
             tournament_weight = NON_RATE_DELTA_MULTIPLIER
             rated = 0
+
+        # if tournament_info_dict[t]["type"]["id"] in [2, 3, 6, 8, 4]:
+        #     if not "questionQty" in tournament_info_dict[t]:
+        #         tournament_weight = NON_RATE_DELTA_MULTIPLIER
+        #         rated = 0
+        #     else:
+        #         tq = sum(tournament_info_dict[t]["questionQty"][qq] for qq in tournament_info_dict[t]["questionQty"])
+        #         if tq > 150:
+        #             tournament_weight = NON_RATE_DELTA_MULTIPLIER
+        #             rated = 0
+        #         else:
+        #             tournament_weight = DELTA_MULTIPLIER
+        #             rated = 1
+                        
+        # else:
+        #     tournament_weight = NON_RATE_DELTA_MULTIPLIER
+        #     rated = 0
     
  
 
@@ -977,10 +977,15 @@ def update_tournaments():
     connector = ChGK_API_connector(False)
     conn = sqlite3.connect(r'Output/rating.db')
     # connector.load_cache("cache.pickle", from_pickle=True)
-    with open("tournaments_info.json", "r") as file:
-        tournaments_info_dict = json.load(file)
-    last_updated = max(tournaments_info_dict[t]["lastEditDate"] for t in tournaments_info_dict)
-    updated = last_updated[:10]
+    tournaments_info_dict = {}
+    if os.path.isfile("Output/rating_for_site_copy.db"):
+        with open("tournaments_info.json", "r") as file:
+            tournaments_info_dict = json.load(file)
+    
+    updated = "2021-09-01"
+    if len(tournaments_info_dict) > 0:
+        last_updated = max(tournaments_info_dict[t]["lastEditDate"] for t in tournaments_info_dict)
+        updated = last_updated[:10]
     print("Tournament update from", updated)
     test_new = connector.get_all_tournaments(startdate_after="2021-09-01", last_edit_date=updated)
     for t in tqdm(test_new):
@@ -1031,7 +1036,7 @@ def main():
 
     actual_release = season_by_datetime(datetime.now())
     start_from_release = update_tournaments()
-    start_from_release = 0
+    # start_from_release = 01
     clear_db(start_from_release = start_from_release)
     process_all_data(start_from_release = start_from_release)
     update_team_ratings(actual_release)
