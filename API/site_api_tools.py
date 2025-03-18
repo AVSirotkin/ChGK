@@ -122,42 +122,18 @@ class ChGK_API_connector:
                     page += 1
                     next = (len(infoA)==100)
                 else:
-                    if r.status_code == 500:
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-9)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-8)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-7)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-6)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-5)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-4)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-3)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-2)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-1)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10)+"&itemsPerPage=20"+suffix, headers={'accept': 'application/json'})
-                        infoA = r.json()
-                        res += infoA
-                        page += 1
-
-                        next = True
-
                     print(f"bad respose code {r.status_code}")
+                    
+                    if r.status_code == 500:
+                        for j in range(10):
+                            r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-9+j)+"&itemsPerPage=10"+suffix, headers={'accept': 'application/json'})
+                            infoA = r.json()
+                            res += infoA
+                            if len(infoA) < 10:
+                                break
+                        page += 1
+                        next = (len(infoA)==10)
+
                     time.sleep(5)
 
         return res
