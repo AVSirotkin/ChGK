@@ -590,7 +590,7 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 1):
 
     minimal_end_date = season_to_date_string(start_from_release-1, True)
     actual_release = season_by_datetime(datetime.now())
-    max_end_data = season_to_date_string(actual_release + 1, True)
+    max_end_data = season_to_date_string(actual_release + 2, True)
 
     ordered_tournament_ids = [t for t in tournament_info_dict if (tournament_info_dict[t]["dateEnd"] < max_end_data) and (tournament_info_dict[t]["dateEnd"] >= minimal_end_date)and(tournament_info_dict[t]["type"]["id"] != 5)]
     ordered_tournament_ids.sort(key = lambda x: tournament_info_dict[x]["dateEnd"])
@@ -969,8 +969,6 @@ def clear_db(start_from_release = 0, only_rates = True):
 
     conn.commit()
     conn.close()
-
-
 
 def update_tournaments():
     logging.info("Start tournament update")
