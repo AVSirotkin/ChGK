@@ -978,7 +978,8 @@ def update_tournaments():
     conn = sqlite3.connect(r'Output/rating.db')
     # connector.load_cache("cache.pickle", from_pickle=True)
     tournaments_info_dict = {}
-    if os.path.isfile("Output/rating_for_site_copy.db"):
+    
+    if os.path.isfile("tournaments_info.json"):
         with open("tournaments_info.json", "r") as file:
             tournaments_info_dict = json.load(file)
     
