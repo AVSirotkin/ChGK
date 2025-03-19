@@ -985,7 +985,7 @@ def update_tournaments():
     if len(tournaments_info_dict) > 0:
         last_updated = max(tournaments_info_dict[t]["lastEditDate"] for t in tournaments_info_dict)
         updated = last_updated[:10]
-    print("Tournament update from", updated)
+    logger.info(f"Tournament update from {updated}")
     test_new = connector.get_all_tournaments(startdate_after="2021-09-01", last_edit_date=updated)
     for t in tqdm(test_new):
         rs = connector.tournament_results(t["id"], True)
@@ -993,7 +993,7 @@ def update_tournaments():
         tournaments_info_dict[str(t["id"])] = t
     ordered_changes = sorted([(x["id"], x["name"], x["lastEditDate"], x["dateEnd"]) for x in test_new], key=lambda x: x[3])  
     if len(ordered_changes) > 0:
-        print("Earliest updated tournament", ordered_changes[0])
+        logger.info(f"Earliest updated tournament {ordered_changes[0]}")
         datestr = ordered_changes[0][3]
         earliest_release = season_by_datestring(datestr)
     else:
@@ -1030,8 +1030,8 @@ def update_team_ratings(actual_release = 0):
 # @profile
 def main():
     FORMAT = '%(asctime)s %(message)s'
-    logging.basicConfig(level=logging.DEBUG, format = FORMAT)
-    logger.info("Start rating estimation")
+    logging.basicConfig(level=logging.DEBUG, format = FORMAT, filename="rating.log")
+    logging.info("Start rating estimation")
 
     actual_release = season_by_datetime(datetime.now())
     start_from_release = update_tournaments()
