@@ -56,10 +56,13 @@ def showAllPlayers(season = 0):
 
 
 @app.route('/api/questions/<int:tournamentid>', subdomain="rating")
-def QuestionsHardnes(tournamentid):
+def QuestionsHardnes(tournamentid, return_json = True):
     conn = get_db_connection()
     questions = conn.execute(f'SELECT hardnes FROM questionrating WHERE tournamentid == {tournamentid}').fetchall()
-    return json.dumps([x['hardnes'] for x in questions], ensure_ascii=True)
+    if return_json:
+        return json.dumps([x['hardnes'] for x in questions], ensure_ascii=True)
+    else:
+        return [x['hardnes'] for x in questions]
 
 @app.route('/api/player/<int:playerid>', subdomain="rating")
 def PlayerRates(playerid):
@@ -96,6 +99,46 @@ def TeamShow(tournamentid, teamid):
     return render_template("teamshow.html", tournamentid=tournamentid, teamid = teamid)
 
 
+
+@app.route('/api/calculate', subdomain="rating")
+def Calculate():
+    #base parameters for calculate:
+    #teams -- list of lists of players id
+    #
+
+    teams_info = request.args.get('teams')
+    teams = json.loads(teams_info)
+    tournamets = request.args.get('tournaments')
+    tournametsid = json.loads(tournamets)
+    
+    result = []
+    
+    used_rates = []
+    team_rates = []
+    if not teams is None: 
+        for t in teams:
+            used_rates.append([])
+            for plid in t:
+                used_rates[-1].append(PlayerRatesLast(plid, False))
+            team_rates.append(rt.independed_ELO(sorted(used_rates[-1], reverse=True)[:6]))
+            result.append({"PlayerRates":used_rates[-1], "TeamRating":team_rates[-1]})
+    team_gets = None
+
+    if not tournametsid is None:
+        team_gets = [[0]*len(tournametsid) for x in  range(len(team_rates))]
+
+        for i, tid in enumerate(tournametsid):
+            qh = QuestionsHardnes(tid, False)
+            if len(qh) > 0:
+                for j, rate in enumerate(team_rates):
+                    team_gets[j][i] = rt.ELO_estimate(rate, qh)
+    
+        for j, rate in enumerate(team_rates):
+            result[j]["TeamEstimates"] = team_gets[j]
+
+    return json.dumps(result)
+
+
 @app.route('/api/player/<int:playerid>/full', subdomain="rating")
 def PlayerDetailedRates(playerid, return_json = True):
     conn = get_db_connection()
@@ -127,13 +170,19 @@ def PlayerDetailedRates(playerid, return_json = True):
 
 
 @app.route('/api/player/<int:playerid>/last', subdomain="rating")
-def PlayerRatesLast(playerid):
+def PlayerRatesLast(playerid, return_json = True):
     conn = get_db_connection()
     ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchone()
     if not ratings is None:
-        return json.dumps(ratings["playerrating"])
+        if return_json:
+            return json.dumps(ratings["playerrating"])
+        else:
+            return ratings["playerrating"]
     else:
-        return json.dumps(1000)
+        if return_json:
+            return json.dumps(1000)
+        else:
+            return 1000
 
 @app.route('/api/player/<int:playerid>/<int:releaseid>', subdomain="rating")
 def PlayerRatesRelease(playerid, releaseid):
@@ -333,6 +382,10 @@ def showPregeneratedPrediction(tournamentid):
     else:
         return "Прогноза для турнира "+str(tournamentid)+" не найдено"
     # return render_template("predict.html",)
+
+
+
+
 
 
 
