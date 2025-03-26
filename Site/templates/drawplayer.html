@@ -49,8 +49,8 @@
 
 
 
-//   var player_data = [{{player_json|safe}}]
-var player_data = []
+   var player_data = [{{player_json|safe}}]
+
 
 </script>
 
@@ -69,17 +69,7 @@ var player_data = []
     margin: { t: 25 } });
 
    }
-
-   function gather_info(){
-      let params = new URLSearchParams(document.location.search);
-      let players = JSON.parse(params.get("players"))
-      players.forEach(element => {
-         add_player_info_no_redraw(element)
-         
-      });
-      my_draw()
-   }
-   document.onload=gather_info()
+   document.onload=my_draw()
 
    async function add_player_info(){
       
@@ -96,20 +86,6 @@ var player_data = []
       my_draw()
    }
 
-   async function add_player_info_no_redraw(playerid){
-      
-
-      let ans = await fetch("/api/player/"+playerid+"/full")
-
-      if (ans.ok) { // если HTTP-статус в диапазоне 200-299
-      // получаем тело ответа (см. про этот метод ниже)
-      let json = await ans.json();
-      player_data.push(json)
-      } else {
-      alert("Ошибка HTTP: " + ans.status);
-      }
-      my_draw()
-   }
 
 </script>
 

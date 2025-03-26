@@ -259,11 +259,19 @@ def showPlayerInfo(playerid):
 
 
 
+
+@app.route("/compareplayers", subdomain="rating")
+def showComparePlayersInfo():
+    # player_json = PlayerDetailedRates(playerid, True)
+    # print(player_json)
+    return render_template("compareplayers.html", player_json = None, playerid=None)
+
+
 @app.route("/compareplayers/<int:playerid>", subdomain="rating")
 def showComparePlayerInfo(playerid):
     player_json = PlayerDetailedRates(playerid, True)
     # print(player_json)
-    return render_template("compareplayers.html", player_json = player_json, playerid=playerid)
+    return render_template("drawplayer.html", player_json = player_json, playerid=playerid)
 
 
 

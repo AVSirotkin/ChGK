@@ -14,6 +14,7 @@
 
 </script>
 
+<div id="info">После получения данных здесь будет график</div>
 
 <div id="team_plot"></div>
 
@@ -64,9 +65,11 @@ function get_info(question_prob) {
 
     async function my_draw(tournamentid, teamid){
     team_res =  await fetch("/api/tournamentteamresult/{{tournamentid}}/{{teamid}}").then((response) => {return (response.json())})
+    document.getElementById('info').innerHTML += "<br> получили результаты"
     team_rates = await fetch("/api/tournamentteamrates/{{tournamentid}}/{{teamid}}").then((response) => {return (response.json())})
+    document.getElementById('info').innerHTML += "<br> получили рейтинги"
     q_hardnes =  await fetch("/api/questions/{{tournamentid}}").then((response) => {return (response.json())})
-
+    document.getElementById('info').innerHTML += "<br> получили сложности вопросов"
 
     let real_data = false
 
@@ -129,9 +132,12 @@ function get_info(question_prob) {
     }
     console.log(steps)
 
+    document.getElementById('info').innerHTML = ""
     Plotly.newPlot(TESTER, draw_data, {
         margin: { t: 25 }, 
         sliders: [{steps:steps, active:qustion_num}],
+        xaxis:{title:{text:"Количество взятых вопросов"}}, 
+        yaxis:{title:{text:"Вероятность результата (%)"}},
         // updatemenus: [{
         //     pad: {t: 60, r: 30},
         //     type: 'buttons',
