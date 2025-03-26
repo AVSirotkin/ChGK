@@ -258,6 +258,11 @@ def showPlayerInfo(playerid):
     return render_template("player.html", ratings=rate_list, playerid=playerid, playername=playername)
 
 
+@app.route("/robots.txt", subdomain="rating")
+def showRobotsTxtInfo():
+    # player_json = PlayerDetailedRates(playerid, True)
+    # print(player_json)
+    return 'User-agent: *\nDisallow: /'
 
 
 @app.route("/compareplayers", subdomain="rating")
