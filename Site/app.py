@@ -1,5 +1,5 @@
 import sqlite3
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, Response
 import datetime
 import time
 import sys
@@ -259,11 +259,10 @@ def showPlayerInfo(playerid):
 
 
 @app.route("/robots.txt", subdomain="rating")
-def showRobotsTxtInfo():
-    # player_json = PlayerDetailedRates(playerid, True)
-    # print(player_json)
-    return 'User-agent: *\nDisallow: /'
-
+def noindex():
+    r = Response(response="User-Agent: *\nDisallow: /\n", status=200, mimetype="text/plain")
+    r.headers["Content-Type"] = "text/plain; charset=utf-8"
+    return r
 
 @app.route("/compareplayers", subdomain="rating")
 def showComparePlayersInfo():
