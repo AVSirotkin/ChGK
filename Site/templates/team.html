@@ -9,7 +9,9 @@
 {% for t in team_base_roster %}
 {{"%.2f"|format(t.playerrating)}} <a href="/player/{{t.playerid}}"> {{t.fullname}} </a> <br>
 {% endfor %}
-
+<br>
+<a href="/compareplayers?players=[{% for t in team_base_roster %}{{t.playerid}}{{',' if not loop.last}}{% endfor %}]"> Графики рейтингов </a>
+<br>
 {% endif %}
 
 
