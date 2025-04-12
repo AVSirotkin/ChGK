@@ -507,6 +507,8 @@ def showTeamInfo(teamid):
     if len(place_req) > 0:
         place_info = dict(place_req[0])
         place_info["page"] = ceil(place_info["place"]/100)
+    else:
+        place_info = None
     conn.close()
     return render_template("team.html", tourresults=tournaments, teamid = teamid, team_base_roster = team_base_roster, team_rating = team_rating, team_name = team_name, place_info=place_info)
 
