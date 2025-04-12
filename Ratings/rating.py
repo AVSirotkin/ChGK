@@ -22,7 +22,7 @@ from memory_profiler import profile
 MIN_QUESTION_RATING = 0
 MAX_QUESTION_RATING = 10000
 DELTA_MULTIPLIER = 3
-# NON_RATE_DELTA_MULTIPLIER = 3
+# NON_RATE_DELTA_MULTIPLIER = 1
 NON_RATE_DELTA_MULTIPLIER = 0.1
 INDEPNDENT_SKILL_QUESTION = 2000
 PLAYER_START_RATING = 1000
@@ -694,8 +694,6 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 1):
             individual  = any(fulldata)
 
 
-
-
         if tournament_info_dict[t]["maiiRating"]:
             tournament_weight = DELTA_MULTIPLIER
             rated = 1
@@ -959,7 +957,7 @@ def clear_db(start_from_release = 0, only_rates = True):
         logging.info("    playerratings")        
         cursor.execute(f'DELETE FROM playerratings WHERE releaseid >= {start_from_release};')
         logging.info("    playerratingsdelta")        
-        cursor.execute(f'DELETE FROM playerratingsdelta WHERE ROWID IN (SELECT playerratingsdelta.ROWID FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
+        cursor.execute(f'DELETE FROM playerratingsdelta WHERE releaseid >= {start_from_release};')
         logging.info("    tournamentratings")        
         cursor.execute(f'DELETE FROM tournamentratings WHERE ROWID IN (SELECT tournamentratings.ROWID FROM tournamentratings JOIN tournaments ON tournamentratings.tournamentid=tournaments.tournamentid WHERE enddate >= "{season_to_date_string(start_from_release-1, True)}");')
         logging.info("    questionrating")        
@@ -1021,8 +1019,17 @@ def update_team_ratings(actual_release = 0):
             team_id = pl[0]
         else:
             loc_rates.append(pl[2])
-    conn.executescript('DELETE FROM base_team_rates')
-    conn.executemany('INSERT INTO base_team_rates VALUES(?,?);',all_rates)
+
+    places = rankdata([-x[1] for x in all_rates]) 
+    rates_with_places = []   
+    for place, x in zip(places, all_rates):
+        rates_with_places.append((x[0], x[1], place))
+
+        
+    # conn.executescript('DELETE FROM base_team_rates')
+    conn.executescript('DROP TABLE base_team_rates')
+    conn.executescript('CREATE TABLE base_team_rates (teamid integer primary key, team_rating real, place real);')
+    conn.executemany('INSERT INTO base_team_rates VALUES(?,?,?);',rates_with_places)
     conn.commit()
     conn.close()
 
@@ -1035,7 +1042,7 @@ def main():
 
     actual_release = season_by_datetime(datetime.now())
     start_from_release = update_tournaments()
-    # start_from_release = 01
+    # start_from_release = 0
     clear_db(start_from_release = start_from_release)
     process_all_data(start_from_release = start_from_release)
     update_team_ratings(actual_release)
