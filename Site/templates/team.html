@@ -4,6 +4,7 @@
 <h2>Команда {{team_name}}</h2> 
 {% if team_rating > 0 %}
 <h3>Рейтинг: {{"%.2f"|format(team_rating)}}</h3>
+<h3>Место: <a href="/teams?page={{place_info.page}}#{{teamid}}">{{"%.1f"|format(place_info.place)}} {{place_info.teamrating}} </a></h3>
 <h4>Базовый состав:</h4>
 
 {% for t in team_base_roster %}
@@ -24,6 +25,7 @@
         <th rowspan="2">Взято вопросов</th>
         <th rowspan="2">Прогноз по вопросам</th>
         <th rowspan="2">Дельта</th>
+        <th rowspan="2">Показанная сила</th>
         <th colspan="2">Соответствие модели</th>
       </tr>
       <tr>
@@ -48,6 +50,7 @@
           <td>{{ tourresult.totalquestions if tourresult.totalquestions is not none else "Нет данных" }}</td>
           <td>{{ "%.2f"|format(tourresult.predictedquestions) }} <div id="predictedquestions{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td>
           <td>{{ "%.2f"|format(tourresult.totalquestions - tourresult.predictedquestions) if (tourresult.totalquestions is not none)and(tourresult.predictedquestions) }}</td>
+          <td>{{ "%.2f"|format(tourresult.teamperformance) if (tourresult.totalquestions is not none) }}</td>
           <td>{{ "{0:0.2f}%".format(tourresult.atleastprob*100) if (tourresult.atleastprob is not none)}} <div id="atleastprob{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td>
           <td>{{ "{0:0.2f}%".format(tourresult.atmostprob*100) if (tourresult.atmostprob is not none)}}<div id="atmostprob{{tourresult.teamid}}"> <div onclick="all_my_show({{tourresult.teamid}}, {{tournamentid}})">(по турам)</div></div></td>
         </tr>

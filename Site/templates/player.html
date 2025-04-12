@@ -17,7 +17,8 @@
 
 
   <h2>{{playerid}} {{playername}}</h2>
-  <a href="/compareplayers?players=[{{playerid}}]">Гравик рейтинга</a>  
+  <h4>Текущее место: <a href="/players?page={{(ratings[0].place/500)|round(0,'ceil')|int }}#{{playerid}}">{{ratings[0].place}}</h2>
+  <a href="/compareplayers?players=[{{playerid}}]">График рейтинга</a>  
 
   <div id="hider" onclick="show_all()">Показать релизы без турниров</div>
 
@@ -30,7 +31,9 @@
         <th>Место</th>
         <th>Турнир</th>
         <th>Команда</th>
-        <th>Дельта</th>
+        <th>Отклонение от прогноза</th>
+        <th>Изменение рейтинга</th>
+
       </tr>
     </thead>
     <tbody>
@@ -43,12 +46,14 @@
             <td rowspan="{{rating.tournaments_count}}">{{ rating.place }}</td>
             <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}">{{ rating.tournaments_details[0].name }}</a></td>
             <td><a href="/teams/{{ rating.tournaments_details[0].teamid }}">{{ rating.tournaments_details[0].teamname }}</a></td>
+            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ "%.2f"|format(rating.tournaments_details[0].totalquestions - rating.tournaments_details[0].predictedquestions) if rating.tournaments_details[0].deltarating is not none else "Нет данных"}}</a></td>
             <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ "%.2f"|format(rating.tournaments_details[0].deltarating) if rating.tournaments_details[0].deltarating is not none else "Нет данных"}}</a></td>
         </tr>
         {% for delta in rating.tournaments_details[1:]%}
         <tr>
           <td><a href="/tournament/{{ delta.tournamentid }}">{{ delta.name }}</a></td>
           <td><a href="/teams/{{ delta.teamid }}">{{ delta.teamname }}</a></td>
+          <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ "%.2f"|format(delta.totalquestions - delta.predictedquestions) if delta.deltarating is not none else "Нет данных"}}</a></td>
           <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ "%.2f"|format(delta.deltarating) if delta.deltarating is not none else "Нет данных"}}</a></td>
         </tr>
 

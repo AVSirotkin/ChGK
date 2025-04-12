@@ -22,7 +22,7 @@
     </thead>
     <tbody>
       {% for rating in ratings %}
-        <tr>
+        <tr id="{{ rating.playerid }}">
           <td>{{ rating.position }}</td>
           <td>{{ rating.playerid }}</td>
           <td><a href="/player/{{ rating.playerid }}">{{ rating.fullname }}</a></td>

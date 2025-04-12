@@ -30,7 +30,7 @@
     </thead>
     <tbody>
       {% for rating in ratings %}
-        <tr>
+        <tr id="{{ rating.teamid }}">
           <td>{{ rating.position }}</td>
           <td>{{ rating.teamid }}</td>
           <td><a href="/teams/{{ rating.teamid }}">{{ rating.name }}</a> <div id="roster{{rating.teamid}}"> <div onclick="my_show({{rating.teamid}}, 0)">(состав)</div></div></td>
