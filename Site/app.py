@@ -481,6 +481,31 @@ def showGD():
 def showCompare():
     return render_template("compare.html")
 
+
+
+@app.route("/api/teams/<int:teamid>/full", subdomain="rating")
+def gatherTeamInfo(teamid, return_json = True):
+    team_data = {}
+    conn = get_db_connection()
+    team_name = conn.execute(f'SELECT teamname FROM teams WHERE teamid = {teamid}').fetchone()
+    if team_name is None:
+        team_data["team_name"] = ""
+    else:
+        team_data["team_name"] = team_name["teamname"]
+
+    tournaments = conn.execute('SELECT * FROM results '+
+    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' + 
+    ' JOIN tournaments ON results.tournamentid=tournaments.tournamentid' + 
+    ' WHERE results.teamid = '+str(teamid) + 
+    ' ORDER BY tournaments.enddate DESC'
+    )#.fetchall()
+    team_data["tournaments"] = [dict(x) for x in tournaments]
+    if return_json:
+        return json.dumps(team_data)
+    else:
+        return team_data
+
+
 @app.route("/teams/<int:teamid>", subdomain="rating")
 def showTeamInfo(teamid):
     conn = get_db_connection()
