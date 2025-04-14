@@ -449,6 +449,9 @@ def showPrediction(tournamentid, questionstournamentid):
         return "Данных о турнире "+str(tournamentid)+" не найдено"
     # return render_template("predict.html",)
 
+@app.route("/funstat/rozhkov", subdomain="rating")
+def showRozhkov():
+    return render_template("funstat/rozhkov.html")
 
 
 @app.route("/predict/studchr2024", subdomain="rating")
