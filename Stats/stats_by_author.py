@@ -4,6 +4,14 @@ import json
 
 personid = 335
 
+with open("stats_by_author.json", "rt", encoding = "utf8") as f:
+    config_info = json.load(f) 
+
+personid = config_info["personid"]
+file_name = config_info["file_name"]
+authora = config_info["authorA"]
+
+
 # %%
 all_Rozhkov = []
 request_link = f"https://gotquestions.online/api/persons/{personid}/questions/"
@@ -78,10 +86,10 @@ table_head += "</tbody>"
 # print(table_head)
 
 # %%
-ft = open("..//Site//templates//funstat//by_author.html", "tr", encoding='utf-8').read()
-ft = ft.replace("{{author_name}}", "Артёма Рожкова")
+ft = open("..//Site//templates//funstat//by_author//by_author.html", "tr", encoding='utf-8').read()
+ft = ft.replace("{{author_name}}", authora)
 ft = ft.replace("{{table_to_insert}}", table_head)
-fw = open("..//Site//templates//funstat//rozhkov.html", "tw", encoding='utf-8')
+fw = open("..//Site//templates//funstat//by_author//"+file_name, "tw", encoding='utf-8')
 fw.write(ft)
 fw.close()
 

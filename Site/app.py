@@ -453,6 +453,14 @@ def showPrediction(tournamentid, questionstournamentid):
 def showRozhkov():
     return render_template("funstat/rozhkov.html")
 
+@app.route("/funstat/by_author/<int:authorid>", subdomain="rating")
+def showPregeneratedAuthorStats(authorid):
+    if os.path.isfile(f"Site/templates/funstat/by_author/{authorid}.html"): 
+        return render_template(f"funstat/by_author/{authorid}.html")
+    else:
+        return "Статистики по автору "+str(authorid)+" нет"
+    # return render_template("predict.html",)
+
 
 @app.route("/predict/studchr2024", subdomain="rating")
 def showStudChR():
