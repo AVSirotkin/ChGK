@@ -58,9 +58,13 @@ for tourid in Rozhkov_by_tour:
     played = len([i for i in Rozhkov_by_tour[tourid] if i < len(result[0][2])])
     q_ids = [i for i in Rozhkov_by_tour[tourid] if i < len(result[0][2])]
     for t in result:
+        if t[2] is None:
+            continue
         local_team_results[t[0]] = {"teamid":t[0], "tournamentid":tourid, "played": played, "get":sum(t[2][i]=="1" for i in q_ids), "predict":sum(prob(t[1], h[0]) for h in hardnes if (h[1]-1) in q_ids)}
     
     for p in roster:
+        if not p[0] in local_team_results:
+            continue
         if not p[1] in players_stat:
             plinfo = conn.execute(f"SELECT surname, name from players WHERE playerid == {p[1]}").fetchone()
             players_stat[p[1]] = {"name":plinfo[0]+" "+plinfo[1],"total_get": 0, "total_played":0, "predicted":0, "detailed":[]}
