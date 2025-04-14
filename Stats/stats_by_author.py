@@ -70,7 +70,7 @@ table_head = '''
     <tbody>
     '''
 for plid in players_stat:
-    table_head += f"<tr><td>{players_stat[plid]["name"]}</td><td>{players_stat[plid]["total_played"]}</td><td>{players_stat[plid]["total_get"]}</td><td>{players_stat[plid]["predicted"]:0.2f}</td>"
+    table_head += f'<tr><td><a href = "/player/{plid}">{players_stat[plid]["name"]}</a></td><td>{players_stat[plid]["total_played"]}</td><td>{players_stat[plid]["total_get"]}</td><td>{players_stat[plid]["predicted"]:0.2f}</td>'
     table_head += f"<td>{players_stat[plid]["total_get"] - players_stat[plid]["predicted"] :0.2f}</td><td>{players_stat[plid]["total_get"]/players_stat[plid]["total_played"]:0.2f}</td>"
     table_head += f"<td>{(players_stat[plid]["total_get"] - players_stat[plid]["predicted"])/players_stat[plid]["total_played"] :0.2f}</td><td>{(players_stat[plid]["total_get"] - players_stat[plid]["predicted"])/players_stat[plid]["predicted"]:0.2f}</td></tr>\n"
 
