@@ -46,8 +46,8 @@
             <td rowspan="{{rating.tournaments_count}}">{{ rating.place }}</td>
             <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}">{{ rating.tournaments_details[0].name }}</a></td>
             <td><a href="/teams/{{ rating.tournaments_details[0].teamid }}">{{ rating.tournaments_details[0].teamname }}</a></td>
-            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ "%.2f"|format(rating.tournaments_details[0].totalquestions - rating.tournaments_details[0].predictedquestions) if rating.tournaments_details[0].deltarating is not none else "Нет данных"}}</a></td>
-            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ "%.2f"|format(rating.tournaments_details[0].deltarating) if rating.tournaments_details[0].deltarating is not none else "Нет данных"}}</a></td>
+            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ ("%.2f"|format(rating.tournaments_details[0].totalquestions - rating.tournaments_details[0].predictedquestions)) if (rating.tournaments_details[0].totalquestions is not none) and (rating.tournaments_details[0].predictedquestionsis is not none) else "Нет данных"}}</a></td>
+            <td><a href="/tournament/{{ rating.tournaments_details[0].tournamentid }}#{{rating.tournaments_details[0].teamid}}">{{ ("%.2f"|format(rating.tournaments_details[0].deltarating)) if rating.tournaments_details[0].deltarating is not none else "Нет данных"}}</a></td>
         </tr>
         {% for delta in rating.tournaments_details[1:]%}
         <tr>
