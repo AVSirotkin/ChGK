@@ -52,8 +52,12 @@ for tourid in Rozhkov_by_tour:
     result = conn.execute(f"SELECT results.teamid, teamrating, mask FROM results INNER JOIN tournamentratings ON results.tournamentid == tournamentratings.tournamentid AND results.teamid == tournamentratings.teamid WHERE results.tournamentid == {tourid}").fetchall()
     if len(result) == 0:
         continue
-    roster = conn.execute(f"SELECT teamid, playerid FROM roster WHERE tournamentid=={tourid}").fetchall()
     result = conn.execute(f"SELECT results.teamid, teamrating, mask FROM results INNER JOIN tournamentratings ON results.tournamentid == tournamentratings.tournamentid AND results.teamid == tournamentratings.teamid WHERE results.tournamentid == {tourid}").fetchall()
+    played = len([i for i in Rozhkov_by_tour[tourid] if i < len(result[0][2])])
+    if played == 0:
+        continue
+
+    roster = conn.execute(f"SELECT teamid, playerid FROM roster WHERE tournamentid=={tourid}").fetchall()
     hardnes = conn.execute(f"SELECT hardnes, questionid FROM questionrating WHERE tournamentid=={tourid}").fetchall()
     played = len([i for i in Rozhkov_by_tour[tourid] if i < len(result[0][2])])
     q_ids = [i for i in Rozhkov_by_tour[tourid] if i < len(result[0][2])]
