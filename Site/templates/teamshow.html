@@ -3,6 +3,10 @@
 {% block content %}
 
 <script src="https://cdn.plot.ly/plotly-3.0.0.min.js" charset="utf-8"></script>
+<link href="https://cdn.datatables.net/v/dt/dt-2.2.2/datatables.min.css" rel="stylesheet" integrity="sha384-2vMryTPZxTZDZ3GnMBDVQV8OtmoutdrfJxnDTg0bVam9mZhi7Zr3J1+lkVFRr71f" crossorigin="anonymous">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/v/dt/dt-2.2.2/datatables.min.js" integrity="sha384-2Ul6oqy3mEjM7dBJzKOck1Qb/mzlO+k/0BQv3D3C7u+Ri9+7OBINGa24AeOv5rgu" crossorigin="anonymous"></script>
+
 
 <script>
     var tournamentid = {{tournamentid}}
@@ -17,6 +21,17 @@
 <div id="info">После получения данных здесь будет график</div>
 
 <div id="team_plot"></div>
+
+<div id="questions_table">
+    <table id="Fun" class="table table-striped">
+        <thead>
+            <tr><th>Номер вопроса</th><th>Вероятность взять</th><th>Взят</th>           </thead>
+        <tbody id="table_body">
+
+        </tbody>
+        
+    </table>
+</div>
 
 
 <script>
@@ -82,6 +97,16 @@ function get_info(question_prob) {
             else real_get.push(real_get[i])
         }
 
+        // var table = new DataTable('#Fun', {pageLength: 12});
+        el = document.getElementById("table_body")
+
+        for (i = 0; i < team_res.mask.length; i++){
+            // table.row.add({"Номер вопроса":i+1, "Вероятность взять":elo(team_rates.teamrating, q_hardnes[i])*100, "Взят":team_res.mask[i]})
+            qn = i + 1
+            el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> </tr>"
+        }
+        // table.draw()
+        new DataTable('#Fun', {pageLength: 12});
     }
 
     // console.log(team_rates)
