@@ -25,7 +25,7 @@
 <div id="questions_table">
     <table id="Fun" class="table table-striped">
         <thead>
-            <tr><th>Номер вопроса</th><th>Вероятность взять</th><th>Взят</th>           </thead>
+            <tr><th>Номер вопроса</th><th>Вероятность взять</th><th>Взят</th><th>Дельта</th>           </thead>
         <tbody id="table_body">
 
         </tbody>
@@ -103,7 +103,7 @@ function get_info(question_prob) {
         for (i = 0; i < team_res.mask.length; i++){
             // table.row.add({"Номер вопроса":i+1, "Вероятность взять":elo(team_rates.teamrating, q_hardnes[i])*100, "Взят":team_res.mask[i]})
             qn = i + 1
-            el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> </tr>"
+            el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> <td>"+ (((team_res.mask[i]=="1"?10000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000))/100) +"  </td> </tr>"
         }
         // table.draw()
         new DataTable('#Fun', {pageLength: 12});
