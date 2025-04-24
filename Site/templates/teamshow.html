@@ -21,6 +21,7 @@
 <div id="info">После получения данных здесь будет график</div>
 
 <div id="team_plot"></div>
+<div id="waterfall_plot"></div>
 
 <div id="questions_table">
     <table id="Fun" class="table table-striped">
@@ -106,7 +107,22 @@ function get_info(question_prob) {
             el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> <td>"+ (((team_res.mask[i]=="1"?10000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000))/100) +"  </td> </tr>"
         }
         // table.draw()
-        new DataTable('#Fun', {pageLength: 12});
+
+        new DataTable('#Fun', {pageLength: 120, rowCallback: function (row, data, index) {
+            if (data[3] <= -75 ) {
+                $(row).css('background-color', 'red');
+            }
+            else if (data[3] <= - 60){
+                $(row).css('background-color', 'pink');
+            }
+            else if (data[3] >=  75){
+                $(row).css('background-color', '#10EE10');
+            }
+            else if (data[3] >=  60){
+                $(row).css('background-color', '#90EE90');
+            }
+
+        }});
     }
 
     // console.log(team_rates)
@@ -184,6 +200,31 @@ function get_info(question_prob) {
         // }]
     }, {responsive: true})
     
+
+    var draw_data_wf = {}
+    draw_data_wf.x = []
+    draw_data_wf.y = [];
+ 
+    for (i = 0; i < team_res.mask.length; i++){
+            // table.row.add({"Номер вопроса":i+1, "Вероятность взять":elo(team_rates.teamrating, q_hardnes[i])*100, "Взят":team_res.mask[i]})
+            qn = i + 1
+            draw_data_wf.x.push(i+1)
+            draw_data_wf.y.push((((team_res.mask[i]=="1"?1000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*1000))/1000))
+    
+            // el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> <td>"+ (((team_res.mask[i]=="1"?10000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000))/100) +"  </td> </tr>"
+        }
+
+    draw_data_wf.name = "Отклонение от пргноза"
+    //   graph_data.name = question_prob.lenght - 1
+    draw_data_wf.type = "waterfall"
+     
+
+
+    Plotly.newPlot(document.getElementById('waterfall_plot'), [draw_data_wf], {
+        margin: { t: 25 }, 
+        xaxis:{title:{text:"Номер вопроса"}}, 
+        yaxis:{title:{text:"Отклонение от прогноза"}},
+    }, {responsive: true})
 //     .then(_ => {
 //         TESTER.on("plotly_buttonclicked", e => {
 //     console.log(e)
