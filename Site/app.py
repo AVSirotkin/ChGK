@@ -34,6 +34,12 @@ def index():
 def about():
     return "About page"
 
+@app.route('/druzhba', subdomain="rating")
+def showDruzhba():
+    return render_template("druzhba50.html")
+
+
+
 @app.route('/players', subdomain="rating")
 @app.route("/players/<int:season>", subdomain="rating")
 def showAllPlayers(season = 0):
