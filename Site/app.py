@@ -38,6 +38,9 @@ def about():
 def showDruzhba():
     return render_template("druzhba50.html")
 
+@app.route('/druzhba2025', subdomain="rating")
+def showDruzhba2025():
+    return render_template("druzhba2025.html")
 
 
 @app.route('/players', subdomain="rating")
