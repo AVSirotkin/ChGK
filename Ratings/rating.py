@@ -676,7 +676,8 @@ def process_all_data(SUB_DIR = "Output/TEST", start_from_release = 1):
             # release_results[release_num] = {"release_date": str(release_date)}
             if print_datailes:
                 print("Start working on release "+str(release_num)+":  "+str(release_date))
-        
+            logger.debug("Start working on release "+str(release_num)+":  "+str(release_date))
+
         questionQty = 0
         # print(tournament_info_dict[t]["questionQty"])
         for qqt in tournament_info_dict[t]["questionQty"]:
@@ -979,16 +980,40 @@ def update_tournaments():
         with open("tournaments_info.json", "r") as file:
             tournaments_info_dict = json.load(file)
     
+    current_date = str(datetime.now())    
+
+    print(current_date)
     updated = "2021-09-01"
     if len(tournaments_info_dict) > 0:
-        last_updated = max(tournaments_info_dict[t]["lastEditDate"] for t in tournaments_info_dict)
+        for t in tournaments_info_dict:
+            if not "lastFunUpdate" in tournaments_info_dict[t]:
+                tournaments_info_dict[t]["lastFunUpdate"] = tournaments_info_dict[t]["lastEditDate"]
+    
+        last_updated = max(tournaments_info_dict[t]["lastFunUpdate"] for t in tournaments_info_dict)
+    
         updated = last_updated[:10]
     logger.info(f"Tournament update from {updated}")
+
     test_new = connector.get_all_tournaments(startdate_after="2021-09-01", last_edit_date=updated)
+    
     for t in tqdm(test_new):
         rs = connector.tournament_results(t["id"], True)
         put_tournament_into_DB(t["id"], rs, conn)
         tournaments_info_dict[str(t["id"])] = t
+        tournaments_info_dict[str(t["id"])]["lastFunUpdate"] = current_date
+    
+    for t in tournaments_info_dict:
+        # print(t)
+        if "synchData" in tournaments_info_dict[t]:
+            if "hideQuestionsTo" in tournaments_info_dict[t]["synchData"]:
+                logger.debug(f"Unhide tournament {t}")
+                if (tournaments_info_dict[t]["lastFunUpdate"] < tournaments_info_dict[t]["synchData"]["hideQuestionsTo"])&(tournaments_info_dict[t]["synchData"]["hideQuestionsTo"]<current_date):
+                    rs = connector.tournament_results(t, True)
+                    put_tournament_into_DB(t, rs, conn)
+                    tournaments_info_dict[t]["lastFunUpdate"] = current_date
+
+    
+    
     ordered_changes = sorted([(x["id"], x["name"], x["lastEditDate"], x["dateEnd"]) for x in test_new], key=lambda x: x[3])  
     if len(ordered_changes) > 0:
         logger.info(f"Earliest updated tournament {ordered_changes[0]}")
