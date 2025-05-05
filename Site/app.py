@@ -323,18 +323,37 @@ def showTournamentInfo(tournamentid):
 
 
 @app.route("/tournament_full/<int:tournamentid>", subdomain="rating")
-def showFullTournamentInfo(tournamentid):
+def showFullTournamentFullInfo(tournamentid):
     conn = get_db_connection()
     tournaments = conn.execute('SELECT * FROM results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
     # ' ORDER BY place'
     ).fetchall()
+    
+    tournament_info = conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(tournamentid)).fetchone() 
+
+    tours_number_info = conn.execute('SELECT max(leg) FROM tournaments_legs WHERE tournaments_legs.tournamentid = ' +str(tournamentid)).fetchall()
+    tours_number = 0
+    if len(tours_number_info) >0:
+        tours_number = tours_number_info[0][0]
+
+
+
+    leg_info = conn.execute('SELECT teamid, leg, legquestions, predictedquestions FROM tournaments_legs WHERE tournaments_legs.tournamentid = ' +str(tournamentid)).fetchall()
+    leg_dict = {}
+    for l in leg_info:
+        if not l["teamid"] in leg_dict:
+            leg_dict[l["teamid"]] = {}
+        leg_dict[l["teamid"]][l["leg"]] = {"predict":l["predictedquestions"], "get":l["legquestions"]}
+    
+    print(leg_dict)
+
     # print(tuple(tournaments[0]))
     # print(tournaments[0].keys())
     # print(tournaments[0]['teamid'])
     conn.close()
-    return render_template("tournament_full.html", tourresults=tournaments)
+    return render_template("tournament_full.html", tourresults=tournaments, tournamentid = tournamentid, tournament_info = tournament_info, tours_number=tours_number, leg_dict = leg_dict)
 
 
 @app.route("/legs_info/<int:tournamentid>/<int:teamid>", subdomain="rating")
