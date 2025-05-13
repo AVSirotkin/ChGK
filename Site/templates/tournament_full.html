@@ -68,7 +68,7 @@
           <td><a href="/teamshow/{{tournamentid}}/{{ tourresult.teamid }}">{{ "%.2f"|format(tourresult.totalquestions - tourresult.predictedquestions) if (tourresult.totalquestions is not none)and(tourresult.predictedquestions) }}</a></td>
           {% if tours_number > 0 %}
           {% for i in range(1, tours_number+1) %}
-          <th>{{leg_dict[tourresult.teamid][i]["get"]}}</th>
+          <th>{{leg_dict[tourresult.teamid][i]["get"] if i in leg_dict[tourresult.teamid] else "Нет данных"}}</th>
           {% endfor %}
         
           {% for i in range(1, tours_number+1) %}
