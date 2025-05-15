@@ -33,6 +33,13 @@ Venue_tour_id  = param_dict["venue_tour_id"]
 release        = param_dict["release"]
 tour_names     = param_dict["tour_names"]
 tour_ids       = param_dict["tour_ids"]
+suggested_rosters = {}
+if "suggested_rosters" in param_dict:
+    suggested_rosters = param_dict["suggested_rosters"]
+    print(suggested_rosters)
+
+
+
 # tour_multiplier= param_dict["tour_multiplier"]
 
 
@@ -63,23 +70,52 @@ team_names = {}
 name_ids = {}
 for t in teams:
     tid = t["team"]["id"]
+    print()
     print(t)
     print(tid)
+    print()
     team_names[tid] = t["current"]["name"]
     name_ids[t["current"]["name"]] = tid
     rates[tid] = []
     roster = []
     for pl in t["teamMembers"]:
-        print(pl)
+        # print(pl)
         sql_req = f"SELECT * FROM playerratings WHERE playerid = {pl['player']['id']} and releaseid = {release}"
         row = conn.execute(sql_req).fetchone()
-        print(row)
+        # print(row)
         if row is None:
             rates[tid].append(900)
         else:
             rates[tid].append(row[2])
             pl_rates[pl['player']["surname"]+" "+pl['player']["name"]] = row[2]
         roster.append({"playerid":pl['player']['id'], "playerrating":int(rates[tid][-1]), "fullname": pl['player']["surname"]+" "+pl['player']["name"] + ("" if (pl['player']["patronymic"] is None) else (" "+pl['player']["patronymic"]))}) 
+    
+    print(len(t["teamMembers"]), t["teamMembers"], )
+    if len(t["teamMembers"]) == 0:
+        if str(tid) in suggested_rosters:
+            print("PROCESS SUGGESTED for", tid)
+            for pl_id in suggested_rosters[str(tid)]:
+                print(pl_id)
+                sql_req = f"SELECT * FROM playerratings WHERE playerid = {pl_id} and releaseid = {release}"
+                row = conn.execute(sql_req).fetchone()
+                print(row)
+
+                pl_row = conn.execute(f"SELECT surname, name, patronim FROM players WHERE playerid = {pl_id}").fetchone() 
+                if pl_row is None:
+                    fullname = "unknown"
+                else:
+                    fullname = pl_row[0]+" "+pl_row[1] + ("" if (pl_row[2] is None) else (" "+pl_row[2]))
+
+                if row is None:
+                    rates[tid].append(900)
+                else:
+                    rates[tid].append(row[2])
+
+                    if pl_row is not None:   
+                        pl_rates[pl['player']["surname"]+" "+pl['player']["name"]] = row[2]
+                
+                roster.append({"playerid":pl_id, "playerrating":int(rates[tid][-1]), "fullname": fullname}) 
+
     if len(rates[tid]) > 0:
         team_rates[tid] = rt.independed_ELO(sorted(rates[tid])[-6:],rt.INDEPNDENT_SKILL_QUESTION)
     else:
