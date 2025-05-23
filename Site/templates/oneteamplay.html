@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<script src="https://cdn.plot.ly/plotly-3.0.0.min.js" charset="utf-8"></script>
+<link href="https://cdn.datatables.net/v/dt/dt-2.2.2/datatables.min.css" rel="stylesheet" integrity="sha384-2vMryTPZxTZDZ3GnMBDVQV8OtmoutdrfJxnDTg0bVam9mZhi7Zr3J1+lkVFRr71f" crossorigin="anonymous">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/v/dt/dt-2.2.2/datatables.min.js" integrity="sha384-2Ul6oqy3mEjM7dBJzKOck1Qb/mzlO+k/0BQv3D3C7u+Ri9+7OBINGa24AeOv5rgu" crossorigin="anonymous"></script>
+
+
+<script>
+    // var tournamentid = {{tournamentid}}
+    // var teamid = {{teamid}}
+    var team_res = {}
+    var team_rates = {}
+    var q_hardnes = {}
+    var questions_played = 0
+    var my_mask = Array()
+
+    let params = new URLSearchParams(document.location.search);
+    let players = JSON.parse(params.get("players"))
+    let tournamentid = JSON.parse(params.get("tournament"))
+    // let releaseid = JSON.parse(params.get("release"))
+
+</script>
+
+<div id="questions_table">
+    <div id="question_log"></div>
+    <div id="question_id">Играем вопрос номер 1 из 36</div>
+    <button onclick="plus_button()">Взят(+)</button>   <button onclick="minus_button()">Не взят(-)</button>   <button onclick="del_button()">Удалить последний</button>
+    <!-- <table id="Fun" class="table table-striped">
+        <thead>
+            <tr><th>Номер вопроса</th><th>Вероятность взять</th><th>Взят</th><th>Дельта</th>           </thead>
+        <tbody id="table_body">
+
+        </tbody>
+        
+    </table> -->
+</div>
+
+<div id="info">После получения данных здесь будет график</div>
+<div id="waterfall_plot"></div>
+<div id="team_plot"></div>
+
+
+<script>
+function plus_button(){
+    if (my_mask.length < q_hardnes.length){
+        my_mask.push("1")
+        console.log(my_mask)
+        document.getElementById("question_log").innerText = my_mask.join()
+        redraw_waterfall()
+        if (my_mask.length < q_hardnes.length){
+            document.getElementById("question_id").innerText = "Играем вопрос " + (my_mask.length+1) +" из "+ q_hardnes.length +"."
+        } else {
+            document.getElementById("question_id").innerText = "Все вопросы сыграны."
+        }
+    }
+}
+function minus_button(){
+    if (my_mask.length < q_hardnes.length){
+        my_mask.push("0")
+        document.getElementById("question_log").innerText = my_mask.join()
+        redraw_waterfall()
+        document.getElementById("question_id").innerText = "Играем вопрос " + (my_mask.length+1) +" из "+ q_hardnes.length +"."
+        if (my_mask.length < q_hardnes.length){
+                document.getElementById("question_id").innerText = "Играем вопрос " + (my_mask.length+1) +" из "+ q_hardnes.length +"."
+        } else {
+                document.getElementById("question_id").innerText = "Все вопросы сыграны."
+        }
+    }
+}
+function del_button(){
+    if (my_mask.length > 0) {
+        my_mask.pop()
+    }
+    document.getElementById("question_log").innerText = my_mask.join()
+    redraw_waterfall()
+    document.getElementById("question_id").innerText = "Играем вопрос " + (my_mask.length+1) +" из "+ q_hardnes.length +"."
+}
+function get_info(question_prob) {
+// we assume that data is sorted correctly
+      var graph_data = {}
+      // console.log(player_data.rates)
+      graph_data.x = []
+      graph_data.y = [];
+      for (i=0; i<question_prob.length+1;i++){
+        if (Math.round(question_prob[i]*100) > 0){
+            graph_data.x.push(i)
+            graph_data.y.push(Math.round(question_prob[i]*100)/100);
+        }
+    }
+      graph_data.visible = false
+      graph_data.name = "Ожидание"
+    //   graph_data.name = question_prob.lenght - 1
+      graph_data.type = "bar"
+      return graph_data;
+   }
+
+    function elo(a,b){
+        return 1/(1+Math.pow(10,(b-a)/400))
+    }
+
+    function full_predict(rate, q_hardnes){
+        // console.log(rate, q_hardnes[0])
+        let probs = [[100]]
+        n = q_hardnes.length
+        // console.log(probs[0])
+
+        for(i=0; i<n ;i++){
+            probs.push([probs[i][0]*elo(q_hardnes[i], rate)])
+            for(j=0; j<i; j++){
+                probs[i+1].push(probs[i][j+1]*elo(q_hardnes[i], rate) + probs[i][j]*elo(rate, q_hardnes[i]))
+            }
+            probs[i+1].push(probs[i][i]*elo(rate, q_hardnes[i]))
+            // console.log(probs[i])        
+        }
+
+        return(probs)
+
+    }
+
+
+    async function my_draw(tournamentid, teamid){
+    team_res = {}
+    const calc_link = "/api/calculate?teams=[["+players.join()+"]]&tournaments=["+tournamentid+"]"
+    team_rates_infos = await fetch(calc_link).then((response) => {return (response.json())})
+    document.getElementById('info').innerHTML += "<br> получили рейтинги"
+    q_hardnes =  await fetch("/api/questions/"+tournamentid).then((response) => {return (response.json())})
+    document.getElementById('info').innerHTML += "<br> получили сложности вопросов"
+
+    let real_data = false
+
+    if (team_res.mask) {
+        real_data = true
+        real_get = [0]
+        for (i = 0; i < team_res.mask.length; i++){
+            if (team_res.mask[i]=="1")
+                real_get.push(real_get[i]+1)  
+            else real_get.push(real_get[i])
+        }
+
+        // var table = new DataTable('#Fun', {pageLength: 12});
+        el = document.getElementById("table_body")
+
+        for (i = 0; i < team_res.mask.length; i++){
+            // table.row.add({"Номер вопроса":i+1, "Вероятность взять":elo(team_rates.teamrating, q_hardnes[i])*100, "Взят":team_res.mask[i]})
+            qn = i + 1
+            el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> <td>"+ (((team_res.mask[i]=="1"?10000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000))/100) +"  </td> </tr>"
+        }
+        // table.draw()
+
+        new DataTable('#Fun', {pageLength: 120, rowCallback: function (row, data, index) {
+            if (data[3] <= -75 ) {
+                $(row).css('background-color', 'red');
+            }
+            else if (data[3] <= - 60){
+                $(row).css('background-color', 'pink');
+            }
+            else if (data[3] >=  75){
+                $(row).css('background-color', '#10EE10');
+            }
+            else if (data[3] >=  60){
+                $(row).css('background-color', '#90EE90');
+            }
+
+        }});
+    }
+
+    console.log(team_rates_infos)
+    console.log(team_rates_infos[0].TeamRating)
+    console.log(q_hardnes)
+    // console.log(real_get)
+    
+    let get_prob = full_predict(team_rates_infos[0].TeamRating, q_hardnes)
+
+    console.log(get_prob)
+
+    TESTER = document.getElementById('team_plot');
+   //  console.log(TESTER)
+    
+    var draw_data = get_prob.map((pd) => get_info(pd))
+
+
+
+    // console.log(draw_data)
+    // var draw_data2 = player_data.map((pd) => player_line_info(p  d))
+    var qustion_num = q_hardnes.length
+    // console.log(qustion_num+1)
+    // console.log(qustion_num+1)
+    // console.log(draw_data[qustion_num])
+    draw_data[qustion_num].visible = true
+
+    steps = []
+    for (i=0; i<qustion_num+1; i++){
+        step = {}
+        step.label = i
+        step.method="update"
+        
+        if (real_data){
+            step.args=[{"visible": new Array(qustion_num+1).fill(false),
+                "title": "После вопроса номер: " + i, "x": new Array(qustion_num+2)}]
+            step.args[0].x[qustion_num+1] = [real_get[i]]  // Toggle i'th trace to "visible"
+            step["args"][0]["visible"][qustion_num+1] = true  // Toggle i'th trace to "visible"
+        }
+        else {
+            step.args=[{"visible": new Array(qustion_num+1).fill(false),
+                "title": "После вопроса номер: " + i}]
+
+        }
+        step.args[0].visible[i] = true  // Toggle i'th trace to "visible"
+        steps.push(step)
+    }
+
+    if (real_data) {
+        buttons_data = {x:[real_get[qustion_num]], y:[10], visible:true, name:"Реальность", type:"bar"}
+        draw_data.push(buttons_data)
+    }
+    console.log(steps)
+
+    document.getElementById('info').innerHTML = ""
+
+    Plotly.newPlot(TESTER, draw_data, {
+        margin: { t: 25 }, 
+        sliders: [{steps:steps, active:qustion_num}],
+        xaxis:{title:{text:"Количество взятых вопросов"}}, 
+        yaxis:{title:{text:"Вероятность результата (%)"}},
+        // updatemenus: [{
+        //     pad: {t: 60, r: 30},
+        //     type: 'buttons',
+        //     xanchor: 'left',
+        //     yanchor: 'top',
+        //     x: 0,
+        //     y: 0,
+        //     direction: 'right',
+            
+        //     buttons: [{
+        //     label: 'Взяли',
+        //     execute: false,
+        //     args: []
+        //     }, {
+        //     label: 'Не взяли',
+        //     execute: false,
+        //     args: []
+        //     }]
+        // }]
+    }, {responsive: true})
+    redraw_waterfall()
+
+//     .then(_ => {
+//         TESTER.on("plotly_buttonclicked", e => {
+//     console.log(e)
+//  //   let color = layer._fullData[0].line.color
+//    // let index = colors.findIndex(c => c === color)
+       
+//     if(e.button.label === "Взяли"){
+//         console.log(TESTER._fullData[91])
+//                 console.log(TESTER._fullData[91].x[0]+1)
+//                 let upd = new Array(92)
+//                 upd[91] = [TESTER._fullData[91].x[0]+1]
+//         Plotly.restyle(TESTER, {"x": upd})
+//     } else
+//     {
+
+//         let index = TESTER._fullLayout.sliders.active
+//         index ++
+//         TESTER._fullLayout.sliders[0].active = index
+//         // Plotly.restyle(TESTER, {"sliders[0].active": 20})
+//         Plotly.react(self.id, traces_slider[index], TESTER, self.config);
+//     }
+    
+// //    if(colors[index])
+//   })
+// })
+
+}
+
+function redraw_waterfall(){
+    var draw_data_wf = {}
+    draw_data_wf.x = []
+    draw_data_wf.y = [];
+ 
+    for (i = 0; i < q_hardnes.length; i++){
+            // table.row.add({"Номер вопроса":i+1, "Вероятность взять":elo(team_rates.teamrating, q_hardnes[i])*100, "Взят":team_res.mask[i]})
+            qn = i + 1
+            draw_data_wf.x.push(i+1)
+            if (i < my_mask.length) {
+                draw_data_wf.y.push((((my_mask[i]=="1"?1000:0) - Math.round(elo(team_rates_infos[0].TeamRating, q_hardnes[i])*1000))/1000))
+            } else {
+                draw_data_wf.y.push(0)
+            }
+            // el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> <td>"+ (((team_res.mask[i]=="1"?10000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000))/100) +"  </td> </tr>"
+        }
+
+    draw_data_wf.name = "Отклонение от прогноза"
+    //   graph_data.name = question_prob.lenght - 1
+    draw_data_wf.type = "waterfall"
+     
+    console.log(my_mask)
+
+    console.log(draw_data_wf.y)
+
+    Plotly.newPlot(document.getElementById('waterfall_plot'), [draw_data_wf], {
+        margin: { t: 25 }, 
+        xaxis:{title:{text:"Номер вопроса"}}, 
+        yaxis:{title:{text:"Отклонение от прогноза"}},
+    }, {responsive: true})
+
+}
+
+   document.onload=my_draw(tournamentid)
+
+
+</script>
+
+{% endblock %}

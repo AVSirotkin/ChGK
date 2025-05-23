@@ -296,6 +296,11 @@ def showComparePlayerInfo(playerid):
 
 
 
+@app.route("/oneteamplay", subdomain="rating")
+def showOneTeamPlayInfo():
+    # player_json = PlayerDetailedRates(playerid, True)
+    # print(player_json)
+    return render_template("oneteamplay.html")
 
 
 @app.route("/tournament/<int:tournamentid>", subdomain="rating")
