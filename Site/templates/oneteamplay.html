@@ -153,6 +153,13 @@ function get_info(question_prob) {
     q_hardnes =  await fetch("/api/questions/"+tournamentid).then((response) => {return (response.json())})
     document.getElementById('info').innerHTML += "<br> получили сложности вопросов"
 
+    if (my_mask.length < q_hardnes.length){
+        document.getElementById("question_id").innerText = "Играем вопрос " + (my_mask.length+1) +" из "+ q_hardnes.length +"."
+    } else {
+        document.getElementById("question_id").innerText = "Все вопросы сыграны."
+    }
+
+
     let real_data = false
 
     if (team_res.mask) {
