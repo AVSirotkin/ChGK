@@ -20,7 +20,16 @@
     let params = new URLSearchParams(document.location.search);
     let players = JSON.parse(params.get("players"))
     let tournamentid = JSON.parse(params.get("tournament"))
-    // let releaseid = JSON.parse(params.get("release"))
+    let releaseid = JSON.parse(params.get("release"))
+    let mask_text = String(params.get("mask"))
+    
+    console.log(mask_text)
+    console.log(mask_text.length)
+    if (mask_text != "null"){
+        for (i=0; i<mask_text.length; i++){
+            my_mask.push(mask_text[i])
+        }
+    }
 
 </script>
 
@@ -44,6 +53,11 @@
 
 
 <script>
+function generate_url(){
+    // console.log()
+    new_url = "oneteamplay?players=" + JSON.stringify(players) +"&tournament="+tournamentid+"&mask="+my_mask.join("")
+    return new_url
+}
 function plus_button(){
     if (my_mask.length < q_hardnes.length){
         my_mask.push("1")
@@ -55,6 +69,10 @@ function plus_button(){
         } else {
             document.getElementById("question_id").innerText = "Все вопросы сыграны."
         }
+        // history.pushState("testvalues")
+        upd_url = generate_url()
+        console.log(upd_url)
+        history.replaceState(null, null, upd_url)
     }
 }
 function minus_button(){
@@ -69,6 +87,9 @@ function minus_button(){
                 document.getElementById("question_id").innerText = "Все вопросы сыграны."
         }
     }
+    upd_url = generate_url()
+    console.log(upd_url)
+    history.replaceState(null, null, upd_url)
 }
 function del_button(){
     if (my_mask.length > 0) {
@@ -77,6 +98,9 @@ function del_button(){
     document.getElementById("question_log").innerText = my_mask.join()
     redraw_waterfall()
     document.getElementById("question_id").innerText = "Играем вопрос " + (my_mask.length+1) +" из "+ q_hardnes.length +"."
+    upd_url = generate_url()
+    console.log(upd_url)
+    history.replaceState(null, null, upd_url)
 }
 function get_info(question_prob) {
 // we assume that data is sorted correctly
