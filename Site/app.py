@@ -1,5 +1,9 @@
 import sqlite3
-from flask import Flask, render_template, request, Response
+from flask import Flask, render_template, request, Response, jsonify
+
+# from flask_sqlalchemy import SQLAlchemy
+# from datatables import ColumnDT, DataTables
+
 import datetime
 import time
 import sys
@@ -14,9 +18,10 @@ from math import ceil
 app = Flask(__name__)
 
 
-def get_db_connection():
+def get_db_connection(factory = True):
     conn = sqlite3.connect('file:Output/rating_for_site.db?immutable=1', uri=True)
-    conn.row_factory = sqlite3.Row
+    if factory:
+        conn.row_factory = sqlite3.Row
     return conn
 
 
@@ -41,6 +46,14 @@ def showDruzhba():
 @app.route('/druzhba2025', subdomain="rating")
 def showDruzhba2025():
     return render_template("druzhba2025.html")
+
+
+@app.route('/players2', subdomain="rating")
+@app.route("/players2/<int:season>", subdomain="rating")
+def showAllPlayersDT(season = 0):
+    return render_template("allplayersDT.html", ratings=[], page = 0)
+
+
 
 
 @app.route('/players', subdomain="rating")
@@ -74,6 +87,35 @@ def QuestionsHardnes(tournamentid, return_json = True):
     else:
         return [x['hardnes'] for x in questions]
 
+
+@app.route('/api/players', subdomain="rating")
+def PlayersData():
+    ts = time.time()
+    conn = get_db_connection()
+    # page = request.args.get('page', 1, type=int)
+    # ts = time.time()
+    # conn = get_db_connection()
+    # if season == 0:
+    tmp = conn.execute('SELECT MAX(releaseid) as releaseid FROM playerratings').fetchall()
+    season = int(tmp[0]["releaseid"])
+    # t1 = time.time()
+    # print(page, t1-ts)
+    ratings = conn.execute('SELECT playerratings.place AS position, players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as rating, playerratings.releaseid as releaseid FROM playerratings JOIN players ON playerratings.playerid=players.playerid WHERE playerratings.releaseid='+str(season) + ' ORDER BY playerratings.releaseid DESC, playerratings.playerrating DESC ')
+    t1 = time.time()
+    print(t1-ts)
+    res = json.dumps({"data":[dict(x) for x in ratings]})
+    t2 = time.time()
+    print(t2-t1)
+    return res
+    # 'LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
+
+
+
+    # conn = get_db_connection()
+    # ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC')
+    # return json.dumps({x["releaseid"]:x["playerrating"] for x in ratings})
+
+
 @app.route('/api/player/<int:playerid>', subdomain="rating")
 def PlayerRates(playerid):
     conn = get_db_connection()
@@ -103,6 +145,40 @@ def AllTeamRates(tournamentid):
     if res is None:
         return {}
     return json.dumps([dict(r) for r in res])
+
+@app.route("/api/tournament_full/<int:tournamentid>", subdomain="rating")
+def apiFullTournamentFullInfo(tournamentid):
+    conn = get_db_connection()
+    tournaments_r = conn.execute('SELECT * FROM results '+
+    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
+    ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
+    # ' ORDER BY place'
+    )
+    tournaments = [dict(x) for x in tournaments_r]
+    
+    tournament_info = dict(conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(tournamentid)).fetchone())
+
+    tours_number_info = conn.execute('SELECT max(leg) FROM tournaments_legs WHERE tournaments_legs.tournamentid = ' +str(tournamentid)).fetchall()
+    tours_number = 0
+    if len(tours_number_info) >0:
+        if not tours_number_info[0][0] is None:
+            tours_number = tours_number_info[0][0]
+
+    leg_info = conn.execute('SELECT teamid, leg, legquestions, predictedquestions FROM tournaments_legs WHERE tournaments_legs.tournamentid = ' +str(tournamentid)).fetchall()
+    leg_dict = {}
+    for l in leg_info:
+        if not l["teamid"] in leg_dict:
+            leg_dict[l["teamid"]] = {}
+        leg_dict[l["teamid"]][l["leg"]] = {"predict":l["predictedquestions"], "get":l["legquestions"]}
+    
+    conn.close()
+
+    all_data = dict(tourresults=tournaments, tournamentid = tournamentid, tournament_info = tournament_info, tours_number=tours_number, leg_dict = leg_dict)
+
+    return json.dumps(all_data)
+
+
+
 
 @app.route('/teamshow/<int:tournamentid>/<int:teamid>', subdomain="rating")
 def TeamShow(tournamentid, teamid):
