@@ -38,7 +38,9 @@ if "suggested_rosters" in param_dict:
     suggested_rosters = param_dict["suggested_rosters"]
     print(suggested_rosters)
 
-
+file_id = Venue_tour_id[0]
+if "file_id" in param_dict:
+    file_id = param_dict["file_id"]
 
 # tour_multiplier= param_dict["tour_multiplier"]
 
@@ -256,6 +258,6 @@ ft = ft.replace("{{table_head}}", table_head)
 # fo.close()
 
 # %%
-fo = open(f"Site/templates/predictions/{Venue_tour_id[0]}.html", "w", encoding="utf8")
+fo = open(f"Site/templates/predictions/{file_id}.html", "w", encoding="utf8")
 print(ft, file=fo)
 fo.close()
