@@ -404,6 +404,7 @@ def showTournamentInfo(tournamentid):
 
 
 @app.route("/tournament_full/<int:tournamentid>", subdomain="rating")
+@app.route("/tournament/<int:tournamentid>/tours", subdomain="rating")
 def showFullTournamentFullInfo(tournamentid):
     conn = get_db_connection()
     tournaments = conn.execute('SELECT * FROM results '+
