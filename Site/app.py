@@ -576,9 +576,15 @@ def showStudChRFant():
 
 @app.route("/predict/nevermore2024", subdomain="rating")
 @app.route("/nevermore2024", subdomain="rating")
-@app.route("/nevermore", subdomain="rating")
-def showNevermore():
+def showNevermore2024():
     return render_template("nevermore24.html")
+
+
+@app.route("/predict/nevermore2025", subdomain="rating")
+@app.route("/nevermore2025", subdomain="rating")
+@app.route("/nevermore", subdomain="rating")
+def showNevermore2025():
+    return render_template("predictions/10011859.html")
 
 
 @app.route("/nevermore_v2", subdomain="rating")
