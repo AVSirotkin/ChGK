@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script src='https://cdn.plot.ly/plotly-2.31.1.min.js'></script>
+
+<h2>Страничка сравнения команд собравшихся на {{tounament_name}}</h2>
+
+<p>Выберите 2 команды из списка участников и ожидаемую сложность вопросов и смотрите на прогноз</p>
+
+
+
+<select type="text" id="team1" list="players_list" placeholder="команда 1" onchange="UpdateAll()"> </select> <select type="text" id="team2" list="players_list" placeholder="команда 2" onchange="UpdateAll()"></select>  
+<datalist id="players_list">
+</datalist>
+
+<select id="variant" onchange="UpdateAll()">  
+    {{question_hardnes_names}}
+</select>
+
+<table>  <thead>
+    <tr>
+      <th width="100pt">Первая победит</th>
+      <th width="100pt">Ничья</th>
+      <th width="100pt">Вторая победит</th>
+  </thead>
+  <tbody>
+      <tr>
+        <td id = "first_win"></td>
+        <td id = "draw"></td>
+        <td id = "second_win"></td>
+      </tr>
+  </tbody><table>
+
+    <h2>Графики прогноза взятых вопросов</h2>
+
+    <div id="graph"></div>
+
+    <script>
+    
+        var team_names = {{team_names_text}}
+
+        var my_list  = document.getElementById("players_list")
+        team_names.toSorted(function (a, b) {return a.toLowerCase().localeCompare(b.toLowerCase());}).forEach((element) => {
+            var el = document.createElement("option"); el.innerHTML = element; my_list.appendChild(el); 
+            var el = document.createElement("option"); el.innerHTML = element; document.getElementById("team1").appendChild(el); 
+            var el = document.createElement("option"); el.innerHTML = element; document.getElementById("team2").appendChild(el); 
+    })
+
+    </script>
+
+
+{{const_data_script}}  
+                       
+{{team_roster_text_script}}  
+    
+<script>
+    
+    function my_show(teamid) {
+      document.getElementById("roster"+teamid).innerHTML = team_rosters_text[teamid];
+    }
+  
+    function UpdateAll(){
+        // var sel.options[sel.selectedIndex].text
+        // console.log(document.getElementById("team1").selectedIndex, document.getElementById("team1").options[document.getElementById("team1").selectedIndex].text, team_names)
+        var index1 = team_names.indexOf(document.getElementById("team1").options[document.getElementById("team1").selectedIndex].text)
+        var index2 = team_names.indexOf(document.getElementById("team2").options[document.getElementById("team2").selectedIndex].text)
+        w = 0
+        d = 0
+        l = 0
+        data_len = data1[document.getElementById("variant").selectedIndex][index1].y.length
+        for (let i = 0; i < data_len; i++) {
+            for (let j = 0; j < data_len; j++) {
+                var prb = data1[document.getElementById("variant").selectedIndex][index1].y[i] * data1[document.getElementById("variant").selectedIndex][index2].y[j]
+                if (i > j) {w = w + prb}
+                if (i < j) {l = l + prb}
+                if (i == j) {d = d + prb}
+            }
+        }
+        
+        document.getElementById("first_win").innerHTML = (w*100).toFixed(3)+"%"
+        document.getElementById("draw").innerHTML = (d*100).toFixed(3)+"%"
+        document.getElementById("second_win").innerHTML = (l*100).toFixed(3)+"%"
+
+
+        var data = [data1[document.getElementById("variant").selectedIndex][index1], data1[document.getElementById("variant").selectedIndex][index2]];
+        
+
+        var layout = {barmode: 'group'};
+
+        Plotly.newPlot('graph', data, layout);
+
+    }
+    UpdateAll()
+
+document.addEventListener('DOMContentLoaded', function() {
+    const filterSelects = document.querySelectorAll('.filter-select');
+
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            filterTable();
+        });
+    });
+
+    function filterTable() {
+        const filterValues = Array.from(filterSelects).map(select => 
+            select.value.toLowerCase()
+        );
+
+        const rows = document.querySelectorAll('#Tournament tbody tr');
+        
+        rows.forEach(row => {
+            let showRow = true;
+            const cells = row.querySelectorAll('td');
+            
+            if (filterValues[0] && !cells[2].textContent.toLowerCase().includes(filterValues[0])) {
+                showRow = false;
+            }
+
+            row.style.display = showRow ? '' : 'none';
+        });
+    }
+});
+</script>
+
+
+<h2> Таблица с прогнозом по взятым вопросам</h2>
+<div class="row mb-3">
+    <div class="col-md-2">
+        <select class="form-select filter-select" data-column="3">
+            <option value="">Все площадки</option>
+            {{options_venues}}
+            <!-- <option value="Санкт-Петербург">Санкт-Петербург</option> -->
+        </select>
+    </div>
+</div>
+
+<table id="Tournament" class="table table-striped">
+    <thead>
+	{{table_head}}
+   </thead>
+    <tbody>
+
+        {{main_table_body}}
+                       </tbody>
+
+{% endblock %}

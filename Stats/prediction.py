@@ -252,6 +252,13 @@ table_head += "</tr>\n"
 ft = ft.replace("{{main_table_body}}", table_body)
 ft = ft.replace("{{table_head}}", table_head)
 
+venues_option = "" 
+for v in Venue_names:
+    venues_option += f'<option value="{v}">{v}</option>\n'
+ft = ft.replace("{{options_venues}}", venues_option)
+
+
+
 # %%
 # fo = open("test.html", "w", encoding="utf8")
 # print(ft, file=fo)
