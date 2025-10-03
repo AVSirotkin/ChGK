@@ -455,13 +455,13 @@ def showTournamentInfo(tournamentid):
 def showFullTournamentFullInfo(tournamentid):
     conn = get_db_connection()
     tournaments = conn.execute('SELECT * FROM data.results as results '+
-    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid'+
-    ' LEFT JOIN tournamentshardnes ON tournaments.tournamentid == tournamentshardnes.tournamentid' +  
+    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
     # ' ORDER BY place'
     ).fetchall()
     
-    tournament_info = conn.execute('SELECT * FROM data.tournaments as tournaments  WHERE tournamentid = '+str(tournamentid)).fetchone() 
+    # tournament_info = conn.execute('SELECT * FROM data.tournaments as tournaments  WHERE tournamentid = '+str(tournamentid)).fetchone() 
+    tournament_info = conn.execute('SELECT * FROM data.tournaments as tournaments LEFT JOIN tournamentshardnes ON tournaments.tournamentid == tournamentshardnes.tournamentid WHERE tournaments.tournamentid = '+str(tournamentid)).fetchone() 
 
     tours_number_info = conn.execute('SELECT max(leg) FROM tournaments_legs WHERE tournaments_legs.tournamentid = ' +str(tournamentid)).fetchall()
     tours_number = 0
