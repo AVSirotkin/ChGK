@@ -6,6 +6,7 @@
 #TODO: Handle server response error
 
 BASE_CHGK_API_URL = "https://api.rating.chgk.info"
+BASE_CHGK_API_URL = "https://rating-api.pecheny.me"
 
 import json
 import pickle as pickle
@@ -160,10 +161,28 @@ class ChGK_API_connector:
                     print(f"retry attempt in 5 seconds due bad response code {r.status_code}")
                     time.sleep(5)
 
-
         if self.use_cache:
             self.API_cache["tournament_results"][str(idtournament)] = results
         
+        return results
+    
+    def tournament_info(self, idtournament, max_attempt = 10):
+        retry = max_attempt
+        results = None
+        while retry:
+            retry -= 1
+            try:
+                r = requests.get(BASE_CHGK_API_URL + "/tournaments/"+str(idtournament), headers={'accept': 'application/json'})
+            except:
+                print("retry attempt in 5 seconds")
+                time.sleep(5)
+            else:
+                if r.status_code == 200:
+                    results = r.json()
+                    retry = 0
+                else:
+                    print(f"retry attempt in 5 seconds due bad response code {r.status_code}")
+                    time.sleep(5)
         return results
     
     def player_info(self, idplayer, forced = False):

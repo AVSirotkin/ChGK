@@ -50,8 +50,8 @@
   </script> 
 
   <h1>{{tournament_info["name"]}}</h1>
-  <h4>Сроки проведения с {{tournament_info["startdate"]}} по {{tournament_info["enddate"]}}</h4>
-  <h4>Оценка сложности турнира: {{"%.2f"|format(tournament_info["hardnes"])}}</h4>
+  <h4>Сроки проведения с {{tournament_info["dateStart"]}} по {{tournament_info["dateEnd"]}}</h4>
+  <h4>Оценка сложности турнира: {{"%.2f"|format(tournament_info["hardnes"]) if (tournament_info["hardnes"] is not none) else "Нет данных"}}</h4>
 
   <a href = "/tournament/{{tournamentid}}/tours"> Подробные результаты</a>
   

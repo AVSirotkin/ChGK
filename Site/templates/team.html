@@ -2,9 +2,14 @@
 
 {% block content %}
 <h2>Команда {{team_name}}</h2> 
-{% if team_rating > 0 %}
+{% if team_rating is not none %}
 <h3>Рейтинг: {{"%.2f"|format(team_rating)}}</h3>
+{% endif %}
+{% if place_info is not none %}
 <h3>Место: <a href="/teams?page={{place_info.page}}#{{teamid}}">{{"%.1f"|format(place_info.place)}} {{place_info.teamrating}} </a></h3>
+{% endif %}
+
+{% if team_base_roster %}
 <h4>Базовый состав:</h4>
 
 {% for t in team_base_roster %}

@@ -14,18 +14,50 @@ import rating as rt
 import json
 import os.path
 from math import ceil
+import configparser
 
 app = Flask(__name__)
 
 
+
+
+
+if __name__ == "__main__":
+    if len(sys.argv) <= 1:
+        print("Use command 'python app.py sitecfg.ini'")
+        param_fname = "sitecfg.ini"
+    else:
+        param_fname = sys.argv[1]
+
+    print(param_fname)
+    
+    config = configparser.ConfigParser()
+    config.read(param_fname)    
+    
+    data_db = config['DATABASES']['data_db']
+    rating_db = config['DATABASES']['ratings_db']
+    
+    website_url = config['SITE']['domain']
+    port = int(config['SITE']['port'])
+ 
+    subdomain = config['SITE']['subdomain']
+
+    print(website_url)
+    app.config['SERVER_NAME'] = website_url
+    
+
+# subdomain = "rating3"
+
 def get_db_connection(factory = True):
-    conn = sqlite3.connect('file:Output/rating_for_site.db?immutable=1', uri=True)
+    # conn = sqlite3.connect('file:Output/rating_for_site.db?immutable=1', uri=True)
+    conn = sqlite3.connect(f'file:{rating_db}?immutable=1', uri=True)
+    conn.execute("ATTACH DATABASE ? AS data;", (data_db,))
     if factory:
         conn.row_factory = sqlite3.Row
     return conn
 
 
-# @app.route('/', subdomain="rating")
+# @app.route('/', subdomain=subdomain)
 # def ratingindex():
 #     return "secret rating page"
 
@@ -39,25 +71,25 @@ def index():
 def about():
     return "About page"
 
-@app.route('/druzhba', subdomain="rating")
+@app.route('/druzhba', subdomain=subdomain)
 def showDruzhba():
     return render_template("druzhba50.html")
 
-@app.route('/druzhba2025', subdomain="rating")
+@app.route('/druzhba2025', subdomain=subdomain)
 def showDruzhba2025():
     return render_template("druzhba2025.html")
 
 
-@app.route('/players2', subdomain="rating")
-@app.route("/players2/<int:season>", subdomain="rating")
+@app.route('/players2', subdomain=subdomain)
+@app.route("/players2/<int:season>", subdomain=subdomain)
 def showAllPlayersDT(season = 0):
     return render_template("allplayersDT.html", ratings=[], page = 0)
 
 
 
 
-@app.route('/players', subdomain="rating")
-@app.route("/players/<int:season>", subdomain="rating")
+@app.route('/players', subdomain=subdomain)
+@app.route("/players/<int:season>", subdomain=subdomain)
 def showAllPlayers(season = 0):
     page = request.args.get('page', 1, type=int)
     ts = time.time()
@@ -67,9 +99,9 @@ def showAllPlayers(season = 0):
         season = int(tmp[0]["releaseid"])
     t1 = time.time()
     print(page, t1-ts)
-    ratings = conn.execute('SELECT ROW_NUMBER() OVER(ORDER BY playerratings.playerrating DESC) AS position, players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
-    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
-    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, pr.playerrating as playerrating, pr.releaseid as releaseid FROM (SELECT * FROM playerratings WHERE releaseid='+str(season)+' ORDER BY playerrating DESC LIMIT 500) as pr JOIN players ON pr.playerid=players.playerid ORDER BY pr.playerrating DESC LIMIT 500').fetchall()
+    ratings = conn.execute('SELECT ROW_NUMBER() OVER(ORDER BY playerratings.playerrating DESC) AS position, players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN data.players as players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
+    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN data.players as players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
+    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, pr.playerrating as playerrating, pr.releaseid as releaseid FROM (SELECT * FROM playerratings WHERE releaseid='+str(season)+' ORDER BY playerrating DESC LIMIT 500) as pr JOIN data.players as players ON pr.playerid=players.playerid ORDER BY pr.playerrating DESC LIMIT 500').fetchall()
     #players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid
     # ratings["position"] = [x+1+(page-1)*500 for x in range(len(ratings))]
     t2= time.time()
@@ -78,7 +110,7 @@ def showAllPlayers(season = 0):
     return render_template("allplayers.html", ratings=ratings, page = page)
 
 
-@app.route('/api/questions/<int:tournamentid>', subdomain="rating")
+@app.route('/api/questions/<int:tournamentid>', subdomain=subdomain)
 def QuestionsHardnes(tournamentid, return_json = True):
     conn = get_db_connection()
     questions = conn.execute(f'SELECT hardnes FROM questionrating WHERE tournamentid == {tournamentid}').fetchall()
@@ -88,7 +120,7 @@ def QuestionsHardnes(tournamentid, return_json = True):
         return [x['hardnes'] for x in questions]
 
 
-@app.route('/api/players', subdomain="rating")
+@app.route('/api/players', subdomain=subdomain)
 def PlayersData():
     ts = time.time()
     conn = get_db_connection()
@@ -100,7 +132,7 @@ def PlayersData():
     season = int(tmp[0]["releaseid"])
     # t1 = time.time()
     # print(page, t1-ts)
-    ratings = conn.execute('SELECT playerratings.place AS position, players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as rating, playerratings.releaseid as releaseid FROM playerratings JOIN players ON playerratings.playerid=players.playerid WHERE playerratings.releaseid='+str(season) + ' ORDER BY playerratings.releaseid DESC, playerratings.playerrating DESC ')
+    ratings = conn.execute('SELECT playerratings.place AS position, players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as rating, playerratings.releaseid as releaseid FROM playerratings JOIN data.players as players ON playerratings.playerid=players.playerid WHERE playerratings.releaseid='+str(season) + ' ORDER BY playerratings.releaseid DESC, playerratings.playerrating DESC ')
     t1 = time.time()
     print(t1-ts)
     res = json.dumps({"data":[dict(x) for x in ratings]})
@@ -116,21 +148,21 @@ def PlayersData():
     # return json.dumps({x["releaseid"]:x["playerrating"] for x in ratings})
 
 
-@app.route('/api/player/<int:playerid>', subdomain="rating")
+@app.route('/api/player/<int:playerid>', subdomain=subdomain)
 def PlayerRates(playerid):
     conn = get_db_connection()
     ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC')
     return json.dumps({x["releaseid"]:x["playerrating"] for x in ratings})
 
-@app.route('/api/tournamentteamresult/<int:tournamentid>/<int:teamid>', subdomain="rating")
+@app.route('/api/tournamentteamresult/<int:tournamentid>/<int:teamid>', subdomain=subdomain)
 def TeamResult(tournamentid, teamid):
     conn = get_db_connection()
-    res = conn.execute(f'SELECT * FROM results WHERE tournamentid = {tournamentid} and teamid = {teamid}').fetchone()
+    res = conn.execute(f'SELECT * FROM data.results WHERE tournamentid = {tournamentid} and teamid = {teamid}').fetchone()
     if res is None:
         return {}
     return json.dumps(dict(res))
 
-@app.route('/api/tournamentteamrates/<int:tournamentid>/<int:teamid>', subdomain="rating")
+@app.route('/api/tournamentteamrates/<int:tournamentid>/<int:teamid>', subdomain=subdomain)
 def TeamRates(tournamentid, teamid):
     conn = get_db_connection()
     res = conn.execute(f'SELECT * FROM tournamentratings WHERE tournamentid = {tournamentid} and teamid = {teamid}').fetchone()
@@ -138,7 +170,7 @@ def TeamRates(tournamentid, teamid):
         return {}
     return json.dumps(dict(res))
 
-@app.route('/api/tournamentteamrates/<int:tournamentid>', subdomain="rating")
+@app.route('/api/tournamentteamrates/<int:tournamentid>', subdomain=subdomain)
 def AllTeamRates(tournamentid):
     conn = get_db_connection()
     res = conn.execute(f'SELECT * FROM tournamentratings WHERE tournamentid = {tournamentid}')
@@ -146,17 +178,17 @@ def AllTeamRates(tournamentid):
         return {}
     return json.dumps([dict(r) for r in res])
 
-@app.route("/api/tournament_full/<int:tournamentid>", subdomain="rating")
+@app.route("/api/tournament_full/<int:tournamentid>", subdomain=subdomain)
 def apiFullTournamentFullInfo(tournamentid):
     conn = get_db_connection()
-    tournaments_r = conn.execute('SELECT * FROM results '+
+    tournaments_r = conn.execute('SELECT * FROM data.results as results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
     # ' ORDER BY place'
     )
     tournaments = [dict(x) for x in tournaments_r]
     
-    tournament_info = dict(conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(tournamentid)).fetchone())
+    tournament_info = dict(conn.execute('SELECT * FROM data.tournaments as tournaments  WHERE tournamentid = '+str(tournamentid)).fetchone())
 
     tours_number_info = conn.execute('SELECT max(leg) FROM tournaments_legs WHERE tournaments_legs.tournamentid = ' +str(tournamentid)).fetchall()
     tours_number = 0
@@ -180,13 +212,13 @@ def apiFullTournamentFullInfo(tournamentid):
 
 
 
-@app.route('/teamshow/<int:tournamentid>/<int:teamid>', subdomain="rating")
+@app.route('/teamshow/<int:tournamentid>/<int:teamid>', subdomain=subdomain)
 def TeamShow(tournamentid, teamid):
     return render_template("teamshow.html", tournamentid=tournamentid, teamid = teamid)
 
 
 
-@app.route('/api/calculate', subdomain="rating")
+@app.route('/api/calculate', subdomain=subdomain)
 def Calculate():
     #base parameters for calculate:
     #teams -- list of lists of players id
@@ -225,30 +257,43 @@ def Calculate():
     return json.dumps(result)
 
 
-@app.route('/api/player/<int:playerid>/full', subdomain="rating")
+@app.route('/api/player/<int:playerid>/full', subdomain=subdomain)
 def PlayerDetailedRates(playerid, return_json = True):
     conn = get_db_connection()
     ts = time.time()
-    # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
-    # deltas_cursor = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid, totalquestions FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN results ON playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
-    # deltas_cursor2 = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, playerratingsdelta.teamid as teamid, teamrating, predictedquestions, teamperformance FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN tournamentratings ON playerratingsdelta.tournamentid=tournamentratings.tournamentid AND playerratingsdelta.teamid=tournamentratings.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
-    deltas_cursor = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid, teamrating, predictedquestions, teamperformance, totalquestions FROM (playerratingsdelta JOIN tournaments ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN results ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid) JOIN tournamentratings ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=tournamentratings.tournamentid AND playerratingsdelta.teamid=tournamentratings.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    # deltas_cursor = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid, totalquestions FROM playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN results ON playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    # deltas_cursor2 = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, playerratingsdelta.teamid as teamid, teamrating, predictedquestions, teamperformance FROM playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN tournamentratings ON playerratingsdelta.tournamentid=tournamentratings.tournamentid AND playerratingsdelta.teamid=tournamentratings.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+   
+    deltas_cursor = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid, teamrating, predictedquestions, teamperformance, totalquestions FROM (playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN data.results as results ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid) JOIN tournamentratings ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=tournamentratings.tournamentid AND playerratingsdelta.teamid=tournamentratings.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    
+    
+    # deltas_cursor = conn.execute('SELECT pd.tournamentid as tournamentid, releaseid, deltarating, teamname, name, pd.teamid as teamid, teamrating, predictedquestions, teamperformance, totalquestions FROM (SELECT * from playerratingsdelta WHERE playerid =  '+str(playerid) +') as pd JOIN data.tournaments as tournaments ON pd.tournamentid=tournaments.tournamentid JOIN data.results as results ON pd.tournamentid=results.tournamentid AND pd.teamid=results.teamid JOIN tournamentratings ON pd.tournamentid=tournamentratings.tournamentid AND pd.teamid=tournamentratings.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    
+    
+    # deltas_cursor = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid, teamrating, predictedquestions, teamperformance FROM playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN tournamentratings ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=tournamentratings.tournamentid AND playerratingsdelta.teamid=tournamentratings.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+   
+   
+    # smth = conn.execute('EXPLAIN SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid, teamrating, predictedquestions, teamperformance, totalquestions FROM (playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN data.results as results ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid) JOIN tournamentratings ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=tournamentratings.tournamentid AND playerratingsdelta.teamid=tournamentratings.teamid')# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
 
-    # smth = conn.execute('EXPLAIN SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid, teamrating, predictedquestions, teamperformance, totalquestions FROM (playerratingsdelta JOIN tournaments ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN results ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid) JOIN tournamentratings ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=tournamentratings.tournamentid AND playerratingsdelta.teamid=tournamentratings.teamid')
+    # smth = conn.execute('EXPLAIN SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid, teamrating, predictedquestions, teamperformance, totalquestions FROM (playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN results ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid) JOIN tournamentratings ON playerratingsdelta.playerid = '+str(playerid) + ' AND playerratingsdelta.tournamentid=tournamentratings.tournamentid AND playerratingsdelta.teamid=tournamentratings.teamid')
     # print([dict(x) for x in smth])
     # # print([x["releaseid"] for x in deltas]  )
     ts11 = time.time()
+    
     deltas = [dict(x) for x in deltas_cursor]
     deltas.sort(key=lambda x: -x["releaseid"])
-    
+    # deltas = []
     ts1 = time.time()
     print(f"gather tournaments info {(ts1-ts):0.2f}({(ts11-ts):0.2f}) sec")
-    # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid JOIN roster ON tournaments.tournamentid=roster.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.tournamentid=tournaments.tournamentid JOIN roster ON tournaments.tournamentid=roster.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
     ratings_cursor = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC')
     ratings = [dict(x) for x in ratings_cursor]
     ts2 = time.time()
-    
+    print(f"collect ratings {(ts2-ts1):0.2f}")  
+    print(f"total prepare {(ts2-ts):0.2f}")  
     player = conn.execute('SELECT * FROM players WHERE playerid = '+str(playerid)).fetchone()
+
     if player is None:
         playerinfo = {"playerid":playerid, "name":"", "surname":"", "patronim":"", "fullname":"Игрок "+str(playerid)}
     else:
@@ -262,7 +307,7 @@ def PlayerDetailedRates(playerid, return_json = True):
         
 
 
-@app.route('/api/player/<int:playerid>/last', subdomain="rating")
+@app.route('/api/player/<int:playerid>/last', subdomain=subdomain)
 def PlayerRatesLast(playerid, return_json = True):
     conn = get_db_connection()
     ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchone()
@@ -277,7 +322,7 @@ def PlayerRatesLast(playerid, return_json = True):
         else:
             return 1000
 
-@app.route('/api/player/<int:playerid>/<int:releaseid>', subdomain="rating")
+@app.route('/api/player/<int:playerid>/<int:releaseid>', subdomain=subdomain)
 def PlayerRatesRelease(playerid, releaseid):
     conn = get_db_connection()
     ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' AND releaseid = '+ str(releaseid) +' ORDER BY releaseid DESC')
@@ -285,20 +330,21 @@ def PlayerRatesRelease(playerid, releaseid):
     return json.dumps({x["releaseid"]:x["playerrating"] for x in ratings})
 
 
-@app.route('/', subdomain="rating")
-@app.route('/teams', subdomain="rating")
+@app.route('/', subdomain=subdomain)
+@app.route('/teams', subdomain=subdomain)
 def showAllTeams(season = 0):
     page = request.args.get('page', 1, type=int)
     ts = time.time()
     conn = get_db_connection()
-    # if season == 0:
-    #     tmp = conn.execute('SELECT MAX(releaseid) as releaseid FROM playerratings').fetchall()
-        # season = int(tmp[0]["releaseid"])
+    if season == 0:
+        tmp = conn.execute('SELECT MAX(releaseid) as releaseid FROM playerratings').fetchall()
+        season = int(tmp[0]["releaseid"])
     t1 = time.time()
     print(page, t1-ts)
-    ratings = conn.execute('SELECT ROW_NUMBER() OVER(ORDER BY base_team_rates.team_rating  DESC) AS position, teams.teamid as teamid, teams.teamname as name, base_team_rates.team_rating as teamrating FROM base_team_rates JOIN teams ON base_team_rates.teamid=teams.teamid ORDER BY base_team_rates.team_rating DESC LIMIT 100 OFFSET '+str(100*(page-1))).fetchall()
-    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
-    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, pr.playerrating as playerrating, pr.releaseid as releaseid FROM (SELECT * FROM playerratings WHERE releaseid='+str(season)+' ORDER BY playerrating DESC LIMIT 500) as pr JOIN players ON pr.playerid=players.playerid ORDER BY pr.playerrating DESC LIMIT 500').fetchall()
+    ratings = conn.execute('SELECT ROW_NUMBER() OVER(ORDER BY teambaseratings.teambaserating DESC) AS position, teams.teamid as teamid, teams.teamname as name, teambaseratings.teambaserating as teamrating, teambaseratings.releaseid as releaseid FROM teambaseratings JOIN data.teams as teams ON teambaseratings.teamid=teams.teamid WHERE releaseid='+str(season)+' ORDER BY teamrating DESC LIMIT 100 OFFSET '+str(100*(page-1))).fetchall()
+    # ratings = conn.execute('SELECT ROW_NUMBER() OVER(ORDER BY playerratings.playerrating DESC) AS position, players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN data.players as players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
+    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid FROM playerratings JOIN data.players as players ON playerratings.playerid=players.playerid WHERE releaseid='+str(season)+' ORDER BY playerratings.playerrating DESC LIMIT 500 OFFSET '+str(500*(page-1))).fetchall()
+    # ratings = conn.execute('SELECT players.playerid as playerid, players.fullname as fullname, pr.playerrating as playerrating, pr.releaseid as releaseid FROM (SELECT * FROM playerratings WHERE releaseid='+str(season)+' ORDER BY playerrating DESC LIMIT 500) as pr JOIN data.players as players ON pr.playerid=players.playerid ORDER BY pr.playerrating DESC LIMIT 500').fetchall()
     #players.playerid as playerid, players.fullname as fullname, playerratings.playerrating as playerrating, playerratings.releaseid as releaseid
     # ratings["position"] = [x+1+(page-1)*500 for x in range(len(ratings))]
     t2= time.time()
@@ -310,17 +356,17 @@ def showAllTeams(season = 0):
 
 
 
-@app.route("/player/<int:playerid>", subdomain="rating")
+@app.route("/player/<int:playerid>", subdomain=subdomain)
 def showPlayerInfo(playerid):
     conn = get_db_connection()
-    # ts = time.time()
-    # # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
-    # deltas = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN results ON playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid').fetchall()# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    ts = time.time()
+    # # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.tournamentid=tournaments.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    # deltas = conn.execute('SELECT playerratingsdelta.tournamentid as tournamentid, releaseid, deltarating, teamname, name, playerratingsdelta.teamid as teamid FROM playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.playerid = '+str(playerid) +' AND playerratingsdelta.tournamentid=tournaments.tournamentid JOIN results ON playerratingsdelta.tournamentid=results.tournamentid AND playerratingsdelta.teamid=results.teamid').fetchall()# ORDER BY playerratingsdelta.releaseid DESC').fetchall()
     # # print([x["releaseid"] for x in deltas]  )
     # deltas.sort(key=lambda x: -x["releaseid"])
     
     # ts1 = time.time()
-    # # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN tournaments ON playerratingsdelta.tournamentid=tournaments.tournamentid JOIN roster ON tournaments.tournamentid=roster.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
+    # # deltas = conn.execute('SELECT * FROM playerratingsdelta JOIN  data.tournaments as tournaments  ON playerratingsdelta.tournamentid=tournaments.tournamentid JOIN roster ON tournaments.tournamentid=roster.tournamentid WHERE playerratingsdelta.playerid = '+str(playerid)+' ORDER BY playerratingsdelta.releaseid DESC').fetchall()
     # ratings = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
     # # ratings = conn.execute('SELECT * FROM playerratings WHERE playerid = '+str(playerid)).fetchall()
     # ts2 = time.time()
@@ -347,24 +393,25 @@ def showPlayerInfo(playerid):
             else:
                 break
 
-
+    ts1 = time.time()
+    print(f"player {playerid} data prepare {(ts1-ts):0.2f}")
     return render_template("player.html", ratings=rate_list, playerid=playerid, playername=playername)
 
 
-@app.route("/robots.txt", subdomain="rating")
+@app.route("/robots.txt", subdomain=subdomain)
 def noindex():
     r = Response(response="User-Agent: *\nDisallow: /\n", status=200, mimetype="text/plain")
     r.headers["Content-Type"] = "text/plain; charset=utf-8"
     return r
 
-@app.route("/compareplayers", subdomain="rating")
+@app.route("/compareplayers", subdomain=subdomain)
 def showComparePlayersInfo():
     # player_json = PlayerDetailedRates(playerid, True)
     # print(player_json)
     return render_template("compareplayers.html", player_json = None, playerid=None)
 
 
-@app.route("/compareplayers/<int:playerid>", subdomain="rating")
+@app.route("/compareplayers/<int:playerid>", subdomain=subdomain)
 def showComparePlayerInfo(playerid):
     player_json = PlayerDetailedRates(playerid, True)
     # print(player_json)
@@ -372,22 +419,22 @@ def showComparePlayerInfo(playerid):
 
 
 
-@app.route("/oneteamplay", subdomain="rating")
+@app.route("/oneteamplay", subdomain=subdomain)
 def showOneTeamPlayInfo():
     # player_json = PlayerDetailedRates(playerid, True)
     # print(player_json)
     return render_template("oneteamplay.html")
 
 
-@app.route("/tournament/<int:tournamentid>", subdomain="rating")
+@app.route("/tournament/<int:tournamentid>", subdomain=subdomain)
 def showTournamentInfo(tournamentid):
     ts = time.time()
     conn = get_db_connection()
     print("conn", time.time()-ts)
 
-    tournament_info = conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(tournamentid)).fetchone() 
+    tournament_info = conn.execute('SELECT * FROM data.tournaments as tournaments LEFT JOIN tournamentshardnes ON tournaments.tournamentid == tournamentshardnes.tournamentid WHERE tournaments.tournamentid = '+str(tournamentid)).fetchone() 
 
-    tournaments = conn.execute('SELECT * FROM results '+
+    tournaments = conn.execute('SELECT * FROM data.results as results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + #+
     ' ORDER BY totalquestions DESC, teamrating DESC;'
@@ -403,17 +450,17 @@ def showTournamentInfo(tournamentid):
         return "Данных о турнире "+str(tournamentid)+" не найдено"
 
 
-@app.route("/tournament_full/<int:tournamentid>", subdomain="rating")
-@app.route("/tournament/<int:tournamentid>/tours", subdomain="rating")
+@app.route("/tournament_full/<int:tournamentid>", subdomain=subdomain)
+@app.route("/tournament/<int:tournamentid>/tours", subdomain=subdomain)
 def showFullTournamentFullInfo(tournamentid):
     conn = get_db_connection()
-    tournaments = conn.execute('SELECT * FROM results '+
+    tournaments = conn.execute('SELECT * FROM data.results as results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
     # ' ORDER BY place'
     ).fetchall()
     
-    tournament_info = conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(tournamentid)).fetchone() 
+    tournament_info = conn.execute('SELECT * FROM data.tournaments as tournaments  WHERE tournamentid = '+str(tournamentid)).fetchone() 
 
     tours_number_info = conn.execute('SELECT max(leg) FROM tournaments_legs WHERE tournaments_legs.tournamentid = ' +str(tournamentid)).fetchall()
     tours_number = 0
@@ -432,7 +479,7 @@ def showFullTournamentFullInfo(tournamentid):
     return render_template("tournament_full.html", tourresults=tournaments, tournamentid = tournamentid, tournament_info = tournament_info, tours_number=tours_number, leg_dict = leg_dict)
 
 
-@app.route("/legs_info/<int:tournamentid>/<int:teamid>", subdomain="rating")
+@app.route("/legs_info/<int:tournamentid>/<int:teamid>", subdomain=subdomain)
 def showLegInfo(tournamentid, teamid):
     print("start showLeg")
     field = request.args.get('field', default = "questions", type = str)
@@ -453,7 +500,7 @@ def showLegInfo(tournamentid, teamid):
     return(text)
 
 
-@app.route("/teams/<int:teamid>/<int:tournamentid>", subdomain="rating")
+@app.route("/teams/<int:teamid>/<int:tournamentid>", subdomain=subdomain)
 def showTeamTournamentInfo(teamid, tournamentid, return_html = True):
     ts = time.time()
     conn = get_db_connection()
@@ -469,11 +516,12 @@ def showTeamTournamentInfo(teamid, tournamentid, return_html = True):
             release_id = 159 #temporel nevermore fix
    
     if tournamentid == 0:
-        roster = conn.execute('SELECT * FROM base_roster '+
+        roster = conn.execute('SELECT * FROM data.base_roster as base_roster '+
         'JOIN playerratings ON base_roster.player_id=playerratings.playerid' +
         ' AND base_roster.teamid = ' + str(teamid) +
         ' AND playerratings.releaseid = ' + str(release_id) + 
-        " JOIN players ON base_roster.player_id=players.playerid" +
+        ' AND base_roster.releaseid = ' + str(release_id) + 
+        " JOIN data.players as players ON base_roster.player_id=players.playerid" +
         ' ORDER BY playerratings.playerrating DESC'
         ).fetchall()
     else:   
@@ -482,7 +530,7 @@ def showTeamTournamentInfo(teamid, tournamentid, return_html = True):
         ' AND roster.teamid = ' + str(teamid) +
         ' AND roster.tournamentid = ' + str(tournamentid) +
         ' AND playerratings.releaseid = ' + str(release_id) + 
-        " JOIN players ON roster.playerid=players.playerid" +
+        " JOIN data.players as players ON roster.playerid=players.playerid" +
         ' ORDER BY playerratings.playerrating DESC'
         ).fetchall()
   
@@ -499,7 +547,7 @@ def showTeamTournamentInfo(teamid, tournamentid, return_html = True):
     # return render_template("roster.html", roster=roster)
 
 
-@app.route("/predict/<int:tournamentid>", subdomain="rating")
+@app.route("/predict/<int:tournamentid>", subdomain=subdomain)
 def showPregeneratedPrediction(tournamentid):
     if os.path.isfile(f"Site/templates/predictions/{tournamentid}.html"): 
         return render_template(f"predictions/{tournamentid}.html")
@@ -513,16 +561,16 @@ def showPregeneratedPrediction(tournamentid):
 
 
 
-@app.route("/predict/<int:tournamentid>/<int:questionstournamentid>", subdomain="rating")
+@app.route("/predict/<int:tournamentid>/<int:questionstournamentid>", subdomain=subdomain)
 def showPrediction(tournamentid, questionstournamentid):
     
     conn = get_db_connection()
     # print("conn", time.time()-ts)
 
-    tournament_info = conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(tournamentid)).fetchone() 
-    qtournament_info = conn.execute('SELECT * FROM tournaments WHERE tournamentid = '+str(questionstournamentid)).fetchone() 
+    tournament_info = conn.execute('SELECT * FROM data.tournaments as tournaments  WHERE tournamentid = '+str(tournamentid)).fetchone() 
+    qtournament_info = conn.execute('SELECT * FROM data.tournaments as tournaments  WHERE tournamentid = '+str(questionstournamentid)).fetchone() 
 
-    tournaments = conn.execute('SELECT * FROM results '+
+    tournaments = conn.execute('SELECT * FROM data.results as results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + #+
     ' ORDER BY teamrating DESC;'
@@ -553,11 +601,11 @@ def showPrediction(tournamentid, questionstournamentid):
         return "Данных о турнире "+str(tournamentid)+" не найдено"
     # return render_template("predict.html",)
 
-@app.route("/funstat/rozhkov", subdomain="rating")
+@app.route("/funstat/rozhkov", subdomain=subdomain)
 def showRozhkov():
     return render_template("funstat/rozhkov.html")
 
-@app.route("/funstat/by_author/<int:authorid>", subdomain="rating")
+@app.route("/funstat/by_author/<int:authorid>", subdomain=subdomain)
 def showPregeneratedAuthorStats(authorid):
     if os.path.isfile(f"Site/templates/funstat/by_author/{authorid}.html"): 
         return render_template(f"funstat/by_author/{authorid}.html")
@@ -566,59 +614,59 @@ def showPregeneratedAuthorStats(authorid):
     # return render_template("predict.html",)
 
 
-@app.route("/predict/studchr2024", subdomain="rating")
+@app.route("/predict/studchr2024", subdomain=subdomain)
 def showStudChR():
     return render_template("studchr24.html")
 
-@app.route("/fantasy/schr", subdomain="rating")
+@app.route("/fantasy/schr", subdomain=subdomain)
 def showStudChRFant():
     return render_template("studchr24fantasy.html")
 
-@app.route("/predict/nevermore2024", subdomain="rating")
-@app.route("/nevermore2024", subdomain="rating")
+@app.route("/predict/nevermore2024", subdomain=subdomain)
+@app.route("/nevermore2024", subdomain=subdomain)
 def showNevermore2024():
     return render_template("nevermore24.html")
 
 
-@app.route("/predict/nevermore2025", subdomain="rating")
-@app.route("/nevermore2025", subdomain="rating")
-@app.route("/nevermore", subdomain="rating")
+@app.route("/predict/nevermore2025", subdomain=subdomain)
+@app.route("/nevermore2025", subdomain=subdomain)
+@app.route("/nevermore", subdomain=subdomain)
 def showNevermore2025():
     return render_template("predictions/10011859.html")
 
 
-@app.route("/nevermore_v2", subdomain="rating")
+@app.route("/nevermore_v2", subdomain=subdomain)
 def showNevermore2():
     return render_template("nevermore2405.html")
 
-@app.route("/predict/gostinydvor", subdomain="rating")
-@app.route("/predict/10707", subdomain="rating")
+@app.route("/predict/gostinydvor", subdomain=subdomain)
+@app.route("/predict/10707", subdomain=subdomain)
 def showGD():
     return render_template("10707.html")
 
-@app.route("/predict/nesova2024", subdomain="rating")
-@app.route("/nesova2024", subdomain="rating")
-@app.route("/compare", subdomain="rating")
+@app.route("/predict/nesova2024", subdomain=subdomain)
+@app.route("/nesova2024", subdomain=subdomain)
+@app.route("/compare", subdomain=subdomain)
 def showCompare():
     return render_template("compare.html")
 
 
 
-@app.route("/api/teams/<int:teamid>/full", subdomain="rating")
+@app.route("/api/teams/<int:teamid>/full", subdomain=subdomain)
 def gatherTeamInfo(teamid, return_json = True):
     team_data = {}
     conn = get_db_connection()
-    team_name = conn.execute(f'SELECT teamname FROM teams WHERE teamid = {teamid}').fetchone()
+    team_name = conn.execute(f'SELECT teamname FROM data.teams as teams WHERE teamid = {teamid}').fetchone()
     if team_name is None:
         team_data["team_name"] = ""
     else:
         team_data["team_name"] = team_name["teamname"]
 
-    tournaments = conn.execute('SELECT * FROM results '+
+    tournaments = conn.execute('SELECT * FROM data.results as results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' + 
-    ' JOIN tournaments ON results.tournamentid=tournaments.tournamentid' + 
+    ' JOIN  data.tournaments as tournaments  ON results.tournamentid=tournaments.tournamentid' + 
     ' WHERE results.teamid = '+str(teamid) + 
-    ' ORDER BY tournaments.enddate DESC'
+    ' ORDER BY tournaments.dateEnd DESC'
     )#.fetchall()
     team_data["tournaments"] = [dict(x) for x in tournaments]
     if return_json:
@@ -627,19 +675,19 @@ def gatherTeamInfo(teamid, return_json = True):
         return team_data
 
 
-@app.route("/teams/<int:teamid>", subdomain="rating")
+@app.route("/teams/<int:teamid>", subdomain=subdomain)
 def showTeamInfo(teamid):
     conn = get_db_connection()
-    team_name = conn.execute(f'SELECT teamname FROM teams WHERE teamid = {teamid}').fetchone()
+    team_name = conn.execute(f'SELECT teamname FROM data.teams as teams WHERE teamid = {teamid}').fetchone()
     if team_name is None:
         team_name = ""
     else:
         team_name = team_name["teamname"]
-    tournaments = conn.execute('SELECT * FROM results '+
+    tournaments = conn.execute('SELECT * FROM data.results as results '+
     'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' + 
-    ' JOIN tournaments ON results.tournamentid=tournaments.tournamentid' + 
+    ' JOIN  data.tournaments as tournaments  ON results.tournamentid=tournaments.tournamentid' + 
     ' WHERE results.teamid = '+str(teamid) + 
-    ' ORDER BY tournaments.enddate DESC'
+    ' ORDER BY tournaments.dateEnd DESC'
     ).fetchall()
     # print(tuple(tournaments[0]))
     # print(tournaments[0].keys())
@@ -649,7 +697,9 @@ def showTeamInfo(teamid):
         team_rating = rt.independed_ELO([x["playerrating"] for x in team_base_roster][:6])
     else:
         team_rating = 0
-    place_req = conn.execute(f"SELECT team_rating, place FROM base_team_rates WHERE teamid={teamid}").fetchall()
+    releaseid = rt.season_by_datetime(datetime.datetime.now())
+    place_req = conn.execute(f"SELECT teambaserating, place FROM teambaseratings WHERE teamid={teamid} and releaseid = {releaseid}").fetchall()
+
     if len(place_req) > 0:
         place_info = dict(place_req[0])
         place_info["page"] = ceil(place_info["place"]/100)
@@ -658,11 +708,11 @@ def showTeamInfo(teamid):
     conn.close()
     return render_template("team.html", tourresults=tournaments, teamid = teamid, team_base_roster = team_base_roster, team_rating = team_rating, team_name = team_name, place_info=place_info)
 
-@app.route("/tournaments", subdomain="rating")
+@app.route("/tournaments", subdomain=subdomain)
 def showAllTournaments():
     today = datetime.datetime.now()
     conn = get_db_connection()
-    tournaments = conn.execute('SELECT * FROM tournaments WHERE enddate < \''+today.strftime("%Y-%m-%d %H:%M:%S")+'\' ORDER BY enddate DESC').fetchall()
+    tournaments = conn.execute('SELECT * FROM data.tournaments as tournaments LEFT JOIN tournamentshardnes ON tournaments.tournamentid== tournamentshardnes.tournamentid WHERE dateEnd < \''+today.strftime("%Y-%m-%d %H:%M:%S")+'\' ORDER BY dateEnd DESC').fetchall()
     print(today.strftime("%Y-%m-%dT%H:%M:%S"))
     conn.close()
     return render_template("alltournaments.html", toursinfo=tournaments)
@@ -682,11 +732,9 @@ def read_cfg():
         port = 80
     return website_url, port
 
-if __name__ == "__main__":
-    website_url, port = read_cfg()
-    print(website_url)
-    app.config['SERVER_NAME'] = website_url
-    
-    
-    app.run(debug=True, port=port)
+
+
+
+
+app.run(debug=True, port=port)
     

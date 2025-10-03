@@ -12,7 +12,7 @@
       <tr>
         <th>ID</th>
         <th>Название</th>
-        <th>Оценка слжности</th>
+        <th>Оценка сложности</th>
 
         <th>Дата окончания</th>
       </tr>
@@ -22,8 +22,8 @@
         <tr>
           <td>{{ tours.tournamentid }}</td>
           <td><a href="/tournament/{{ tours.tournamentid }}">{{ tours.name }}</a></td>
-          <td>{{"%.2f"|format(tours.hardnes)}}</td>
-          <td>{{ tours.enddate }}</td>
+          <td>{{"%.2f"|format(tours.hardnes) if tours.hardnes is not none else "Нет данных"}}</td>
+          <td>{{ tours.dateEnd }}</td>
         </tr>
       {% endfor %}
     </tbody>
