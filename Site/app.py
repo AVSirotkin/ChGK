@@ -455,7 +455,8 @@ def showTournamentInfo(tournamentid):
 def showFullTournamentFullInfo(tournamentid):
     conn = get_db_connection()
     tournaments = conn.execute('SELECT * FROM data.results as results '+
-    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid' +  
+    'JOIN tournamentratings ON results.teamid=tournamentratings.teamid AND results.tournamentid=tournamentratings.tournamentid'+
+    ' LEFT JOIN tournamentshardnes ON tournaments.tournamentid == tournamentshardnes.tournamentid' +  
     ' WHERE results.tournamentid = '+str(tournamentid) + ";"#+
     # ' ORDER BY place'
     ).fetchall()
