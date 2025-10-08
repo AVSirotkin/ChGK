@@ -599,7 +599,7 @@ def process_all_data(rating_db, data_db, start_from_release = 1):
     actual_release = season_by_datetime(datetime.now())
     max_end_data = season_to_date_string(actual_release + 2, True)
 
-    ordered_tournament_ids = cursor.execute("SELECT tournamentid, dateEnd, maii_rating, questionQty, fulljson FROM data.tournaments WHERE dateEnd < ? AND dateEnd > ? and typeoft_id <> 5 ORDER BY dateEnd", (max_end_data, minimal_end_date)).fetchall()
+    ordered_tournament_ids = cursor.execute("SELECT tournamentid, dateEnd, maii_rating, questionQty, fulljson, lastSynchDate FROM data.tournaments WHERE dateEnd < ? AND dateEnd > ? and typeoft_id <> 5 ORDER BY dateEnd", (max_end_data, minimal_end_date)).fetchall()
 
     print("tornaments to process", len(ordered_tournament_ids))
 
@@ -756,6 +756,7 @@ def process_all_data(rating_db, data_db, start_from_release = 1):
         # print(tournament_info_dict[t])
 
         cursor.execute("INSERT OR REPLACE INTO tournamentshardnes VALUES(?,?);", (t[0], Q_hardnes))
+        cursor.execute("INSERT OR REPLACE INTO tournamentlastupdate VALUES(?,?);", (t[0], t[5]))
 
         DBconn.commit()
         # results[t] = {}
@@ -973,6 +974,21 @@ def set_constants(config):
     RATING_WEEK_DEGRADATION = config["RATING_SETTINGS"].getfloat("RATING_WEEK_DEGRADATION")
 
 
+def estimate_earliest_release(rating_db, data_db):
+    conn = sqlite3.connect(rating_db)
+    conn.execute("ATTACH DATABASE ? AS data;", (data_db,))
+    # mindata = conn.execute("SELECT dateEnd, name, data.tournaments.tournamentid FROM data.tournaments LEFT JOIN tournamentlastupdate ON data.tournaments.tournamentid = tournamentlastupdate.tournamentid WHERE (NOT typeoft_id = 5) AND (lastupdate<lastSynchDate OR (lastupdate IS NULL AND NOT lastSynchDate IS NULL))").fetchall()
+    # print(mindata)
+ 
+    mindata = conn.execute("SELECT MIN(dateEnd) FROM data.tournaments LEFT JOIN tournamentlastupdate ON data.tournaments.tournamentid = tournamentlastupdate.tournamentid WHERE (NOT typeoft_id = 5) AND (lastupdate<lastSynchDate OR (lastupdate IS NULL AND NOT lastSynchDate IS NULL))").fetchone()
+    print(mindata)
+    # mindata = conn.execute("SELECT MIN(dateEnd) FROM data.tournaments LEFT JOIN tournamentlastupdate ON data.tournaments.tournamentid = tournamentlastupdate.tournamentid WHERE lastupdate IS NULL").fetchone()
+    if mindata is None:
+        return 0
+    else:
+        return (season_by_datestring(mindata[0]))
+
+
 # @profile
 def main():
 
@@ -988,7 +1004,20 @@ def main():
     
     data_db = config['DATABASES']['data_db']
     rating_db = config['DATABASES']['ratings_db']
+
     
+    if "data_db_site" in config['DATABASES']:
+        data_db_site_copy = config['DATABASES']['data_db_site']
+    else:
+        data_db_site_copy = None
+    if "ratings_db_site" in config['DATABASES']:
+        rating_db_site_copy = config['DATABASES']['ratings_db_site']
+    else:
+        rating_db_site_copy = None
+
+    UpdateData = config['PHASES'].getboolean('UpdateData')
+    UpdateRatings = config['PHASES'].getboolean('UpdateRatings')
+
     set_constants(config)   
     
     FORMAT = '%(asctime)s %(message)s'
@@ -997,33 +1026,59 @@ def main():
 
     actual_release = season_by_datetime(datetime.now())
 
-    start_from_release = update_tournaments_db(data_db)
-    
-    # start_from_release = 0
-    # print(rating_db)
+    if UpdateData:
+        start_from_release_by_update = update_tournaments_db(data_db)
+    else:
+        start_from_release_by_update = None
 
-    clear_rates(rating_db, data_db, start_from_release = start_from_release)
-    
-    process_all_data(rating_db, data_db, start_from_release = start_from_release)
-    # update_team_ratings(rating_db, data_db, actual_release)
+    if UpdateRatings:
+        start_from_release_by_rates = estimate_earliest_release(rating_db, data_db)
+        if not start_from_release_by_update is None:
+            start_from_release = min(start_from_release_by_update, start_from_release_by_rates)
+        else:
+            start_from_release = start_from_release_by_rates
+        # start_from_release = 0
+        # print(rating_db)
+        print(start_from_release, start_from_release_by_rates, start_from_release_by_update)
+        # exit(0)
 
-    exit(0)
+        clear_rates(rating_db, data_db, start_from_release = start_from_release)
+    
+        process_all_data(rating_db, data_db, start_from_release = start_from_release)
+        # update_team_ratings(rating_db, data_db, actual_release)
 
     import shutil
 
     logging.info("base copy start")
-    try:
-        shutil.copyfile('Output/rating.db', 'Output/rating_for_site_copy.db')
-    except Exception:
-        shutil.copyfile('Output/rating.db', 'Output/rating_for_site_copy.db')
+    if (data_db_site_copy is not None) and UpdateData:
+        try:
+            shutil.copyfile(data_db, data_db_site_copy+".tmp")
+        except Exception:
+            shutil.copyfile(data_db, data_db_site_copy+".tmp")
+    
+    if (rating_db_site_copy is not None) and UpdateRatings:
+        try:
+            shutil.copyfile(rating_db, rating_db_site_copy+".tmp")
+        except Exception:
+            shutil.copyfile(rating_db, rating_db_site_copy+".tmp")
+    
+    
     logging.info("base copy finished")
     logging.info("start move")
 
-    if os.path.isfile("Output/rating_for_site_copy.db"):
-        try:
-            shutil.move("Output/rating_for_site_copy.db", "Output/rating_for_site.db")
-        except Exception:
-            pass
+    if (data_db_site_copy is not None) and UpdateData:
+        if os.path.isfile(data_db_site_copy+".tmp"):
+            try:
+                shutil.move(data_db_site_copy+".tmp", data_db_site_copy)
+            except Exception:
+                pass
+
+    if (rating_db_site_copy is not None) and UpdateRatings:
+        if os.path.isfile(rating_db_site_copy+".tmp"):
+            try:
+                shutil.move(rating_db_site_copy+".tmp", rating_db_site_copy)
+            except Exception:
+                pass
         
     logging.info("move finished")
     
