@@ -189,13 +189,14 @@ def put_tournament_results_into_DB(tournamentid, tournament_result, connection):
     connection.commit()           
 
 
-def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_questions = True, question_number = 36, tournament_weight = NON_RATE_DELTA_MULTIPLIER, players_rated_games_cnt = None, detailed_print = False, print_issues = False) : 
+def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_questions = True, question_number = 36, tournament_weight = NON_RATE_DELTA_MULTIPLIER, is_rated = False, players_rated_games_cnt = None, detailed_print = False, print_issues = False) : 
     
     issues = []
     start_time = datetime.now()
     if detailed_print:
         print("START TIME:", start_time, tournamentid)
     logger.debug(f"Process {tournamentid}")
+    
     question_gets = {}
     question_attempts = {}
     local_teams_rates = []
@@ -267,7 +268,7 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
             elif tm[1] == 0:
                 if tm[3] == 9999:
                     team_gets[tm[0]] = None
-                    issues.append((tm[0], "No question data"))
+                    issues.append((tm[0], "No question data, place 9999"))
                 else:
                     team_gets[tm[0]] = 0
                     
@@ -275,7 +276,7 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
                 team_gets[tm[0]] = tm[1]
                 total_gets += tm[1]
     # print("tg", team_gets)
-    local_teams_rates = [player_based_team_ratings[tid] for tid in player_based_team_ratings if not player_based_team_ratings[tid] is None]
+    local_teams_rates = [player_based_team_ratings[tid] for tid in player_based_team_ratings if (not player_based_team_ratings[tid] is None) and (not team_gets[tid] is None)]
     
     score = {}
     if detailed_print:
@@ -321,7 +322,7 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
                 w = w*6 /players_num[tm]
             
             for pl in team_players_id[tm]:
-                if tournament_weight > NON_RATE_DELTA_MULTIPLIER:
+                if is_rated:
                     if pl in players_rated_games_cnt:
                         if players_rated_games_cnt[pl] < 10:
                             wl = w*10/tournament_weight
@@ -671,7 +672,7 @@ def process_all_data(rating_db, data_db, start_from_release = 1):
         #     rated = 0
     
  
-        delta, qv, delta_pl, score, Q_hardnes, issues = process_one_tournament_from_DB(DBconn, t[0], player_ratings, True, questionQty, tournament_weight, players_rated_games_cnt)
+        delta, qv, delta_pl, score, Q_hardnes, issues = process_one_tournament_from_DB(DBconn, t[0], player_ratings, True, questionQty, tournament_weight, rated, players_rated_games_cnt)
 
         all_issues += [(t[0], a, b) for a, b in issues]
 
