@@ -566,17 +566,23 @@ def finalize_release(conn, release, player_rates, player_counts):
     
 
 # @profile
-def process_all_data(rating_db, data_db, start_from_release = 1):
+def process_all_data(rating_db, data_db, start_from_release = 1, in_memory_db = True):
     
     team_rates = {}
     player_ratings = {}
     players_rated_games_cnt = {}
    
     save_data = True
+    if in_memory_db:
+        DBconn = sqlite3.connect(":memory:")
+        conn = sqlite3.connect(rating_db)
+        conn.backup(DBconn)
+        DBconn.execute("ATTACH DATABASE ? AS data;", (data_db,))
 
-    DBconn = sqlite3.connect(rating_db)
-    DBconn.execute("ATTACH DATABASE ? AS data;", (data_db,))
- 
+    else:
+        DBconn = sqlite3.connect(rating_db)
+        DBconn.execute("ATTACH DATABASE ? AS data;", (data_db,))
+
     cursor = DBconn.cursor()
     # cursor.execute("ATTACH DATABASE ? AS data;", (data_db,))
     
@@ -589,7 +595,7 @@ def process_all_data(rating_db, data_db, start_from_release = 1):
     all_issues = []
 
     print("reading tournaments_info")
-    
+    6
     # tournaments_info_list = connector.get_all_rated_tournaments()
  
     # with open('tournaments_info.json', 'r', encoding="utf8") as JSON:
@@ -803,6 +809,9 @@ def process_all_data(rating_db, data_db, start_from_release = 1):
     DBconn.commit()
 
     finalize_release(DBconn, release_num, player_ratings, player_counts=players_rated_games_cnt)
+    if in_memory_db:
+        DBconn.backup(conn)
+        conn.close()
     DBconn.close()
 
 
@@ -1044,7 +1053,6 @@ def main():
         # exit(0)
 
         clear_rates(rating_db, data_db, start_from_release = start_from_release)
-    
         process_all_data(rating_db, data_db, start_from_release = start_from_release)
         # update_team_ratings(rating_db, data_db, actual_release)
 
@@ -1083,6 +1091,11 @@ def main():
         
     logging.info("move finished")
     
-
+# import cProfile
+# import pstats
 if __name__ == "__main__":
     main()
+    # cProfile.run('main()', 'profile_results.prof')
+    # p = pstats.Stats('profile_results.prof')
+    # p.strip_dirs().sort_stats('cumulative').print_stats(10)
+    
