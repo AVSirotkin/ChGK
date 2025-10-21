@@ -286,8 +286,12 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
         # print(question_gets)
         total_gets = sum([question_gets[x] for x in question_gets])
         question_number = len(question_gets)
-        Q_hardnes = max_like(1000, local_teams_rates, total_gets/question_number, False) #TODO: Сделать индивидуальный обход вопросов 
-    
+        if question_number > 0:
+            Q_hardnes = max_like(1000, local_teams_rates, total_gets/question_number, False) #TODO: Сделать индивидуальный обход вопросов 
+        else:
+            print("No question data")
+            Q_hardnes = 10000
+        
         for q in question_gets:
             question_values.append(max_like(1000, local_teams_rates, question_gets[q], False)) #TODO: Сделать индивидуальный обход вопросов (частично снятый)
     else:
