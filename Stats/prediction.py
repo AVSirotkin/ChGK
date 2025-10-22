@@ -2,8 +2,8 @@
 import sqlite3
 import json
 
-# %%
-conn = sqlite3.connect(r'Output/rating.db')
+# %% ToDo: move to config or change it on API connection
+conn = sqlite3.connect(r'Output/ratings.db')
 
 
 # %%
@@ -38,22 +38,48 @@ if "suggested_rosters" in param_dict:
     suggested_rosters = param_dict["suggested_rosters"]
     print(suggested_rosters)
 
+if "question_limit" in param_dict:
+    question_limit = param_dict["question_limit"]
+else:
+    question_limit = 100000
+
 file_id = Venue_tour_id[0]
 if "file_id" in param_dict:
     file_id = param_dict["file_id"]
+
+if "venues_from_data" in param_dict:
+    venues_from_data = param_dict["venues_from_data"]
+else:
+    venues_from_data = False
 
 # tour_multiplier= param_dict["tour_multiplier"]
 
 
 all_teams = []
 venue_by_id = {}
-for n,p in zip(Venue_names, Venue_tour_id):
-    # teams = connector.tournament_results(p, forced=True)
-    teams = connector.tournament_results(p, forced=True)
+
+if venues_from_data:
+    teams = connector.tournament_results(Venue_tour_id[0], forced=True)
+    Venue_names = []
     for t in teams:
-        t["venue"] = n
+        if not t["synchRequest"]["venue"]["name"] in Venue_names:
+            Venue_names.append(t["synchRequest"]["venue"]["name"])
+
+        t["venue"] = t["synchRequest"]["venue"]["name"]
         all_teams.append(t)
-        venue_by_id[t["team"]["id"]] = n
+        venue_by_id[t["team"]["id"]] = t["venue"]
+
+else:
+    for n,p in zip(Venue_names, Venue_tour_id):
+        # teams = connector.tournament_results(p, forced=True)
+        teams = connector.tournament_results(p, forced=True)
+        for t in teams:
+            t["venue"] = n
+            all_teams.append(t)
+            venue_by_id[t["team"]["id"]] = n
+
+print(venues_from_data)
+print(Venue_names)
 
 # %%
 teams = all_teams#teams_never#teams_neh + teams_sec
@@ -72,10 +98,10 @@ team_names = {}
 name_ids = {}
 for t in teams:
     tid = t["team"]["id"]
-    print()
-    print(t)
-    print(tid)
-    print()
+    # print()
+    # print(t)
+    # print(tid)
+    # print()
     team_names[tid] = t["current"]["name"]
     name_ids[t["current"]["name"]] = tid
     rates[tid] = []
@@ -92,15 +118,15 @@ for t in teams:
             pl_rates[pl['player']["surname"]+" "+pl['player']["name"]] = row[2]
         roster.append({"playerid":pl['player']['id'], "playerrating":int(rates[tid][-1]), "fullname": pl['player']["surname"]+" "+pl['player']["name"] + ("" if (pl['player']["patronymic"] is None) else (" "+pl['player']["patronymic"]))}) 
     
-    print(len(t["teamMembers"]), t["teamMembers"], )
+    # print(len(t["teamMembers"]), t["teamMembers"], )
     if len(t["teamMembers"]) == 0:
         if str(tid) in suggested_rosters:
             print("PROCESS SUGGESTED for", tid)
             for pl_id in suggested_rosters[str(tid)]:
-                print(pl_id)
+                # print(pl_id)
                 sql_req = f"SELECT * FROM playerratings WHERE playerid = {pl_id} and releaseid = {release}"
                 row = conn.execute(sql_req).fetchone()
-                print(row)
+                # print(row)
 
                 pl_row = conn.execute(f"SELECT surname, name, patronim FROM players WHERE playerid = {pl_id}").fetchone() 
                 if pl_row is None:
@@ -161,7 +187,7 @@ for nm in tour_names:
     # <option>Как на Nevermore-2 2022 (TrueDL 6.7)</option>
 
 for id in tour_ids:
-    qrates.append([row[2] for row in conn.execute(f"SELECT * FROM questionrating WHERE tournamentid = {id}")])
+    qrates.append([row[2] for row in conn.execute(f"SELECT * FROM questionrating WHERE tournamentid = {id} AND questionid <= {question_limit}")])
 
 ft = ft.replace("{{question_hardnes_names}}", tour_options_str)
 
@@ -229,7 +255,7 @@ for v in Venue_names:
 
 for tid in sorted_tid:
     table_body += f"<tr><td>{sum([loc_places[v] for v in loc_places]) + 1}</td>"
-    if len(Venue_tour_id) > 1:
+    if len(Venue_names) > 1:
         table_body += f"<td>{loc_places[venue_by_id[tid]] + 1}</td><td>{venue_by_id[tid]}</td>"
     table_body += f"<td><a href='/teams/{tid}'>{team_names[tid]}</a><div id='roster{tid}'> <div onclick='my_show({tid})'>(состав)</div></td><td>{team_rates[tid]:.2f}</td>"
     
@@ -240,7 +266,7 @@ for tid in sorted_tid:
 
 # %%
 table_head = '<tr><th rowspan="2">Место</th>'
-if len(Venue_tour_id) > 1:
+if len(Venue_names) > 1:
     table_head += '<th rowspan="2">Место на площадке</th><th rowspan="2">Площадка</th>'
 table_head += f'<th rowspan="2">Команда</th><th rowspan="2">Сила команды</th><th colspan="{len(tour_names)}">Прогноз по вопросам турнира:</th></tr><tr>'
 for nm in tour_names:
