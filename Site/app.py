@@ -109,6 +109,49 @@ def showAllPlayers(season = 0):
     conn.close()
     return render_template("allplayers.html", ratings=ratings, page = page)
 
+@app.route('/api/byauthor/<int:authorid>/<int:playerid>', subdomain=subdomain)
+def AuthorPlayerStats(authorid, playerid, return_json = True):
+    print(authorid, playerid)
+    conn = get_db_connection()
+    conn.execute("ATTACH DATABASE 'Output/authors.db' as authors")
+    player_data = conn.execute("SELECT a.tournamentid, a.questionid, a.gqid, r.teamid, teamrating, hardnes, d.teamname, d.mask, tr.name FROM authors.questions AS a INNER JOIN questionrating as q ON a.authorid == ? AND a.tournamentid==q.tournamentid AND a.questionid==q.questionid " +
+                               "INNER JOIN data.roster as r ON r.playerid = ? AND a.tournamentid == r.tournamentid " +
+                                "INNER JOIN tournamentratings as t ON r.tournamentid==t.tournamentid AND r.teamid==t.teamid "+
+                                "INNER JOIN data.results as d ON r.tournamentid==d.tournamentid AND r.teamid==d.teamid "+
+                                "INNER JOIN data.tournaments as tr on tr.tournamentid==d.tournamentid", (authorid, playerid,))
+                               
+                               
+                               
+                            #    , (authorid, playerid))#\
+    # player_data = conn.execute("SELECT * FROM questionrating as q ")#\
+                                # a.tournamentid, a.questionid, q.hardnes"\
+                                #, r.playerid, t.teamrating  " \
+                                # "FROM authors.questions as a INNER JOIN questionrating as q ON a.authorid = ? AND a.tournamentid==q.tournamentid AND a.questionid == q.questionid " \
+                                # "", (authorid,))
+    #                             "INNER JOIN data.roster as r ON r.playerid = ? AND a.tournamentid == r.tournamentid " \
+    #                             "INNER JOIN tournamentratings as t ON r.tournamentid==t.tournamentid AND r.teamid==t.teamid", (authorid, playerid,))
+    if return_json:
+        return json.dumps([dict(x) for x in player_data], ensure_ascii=True)
+    else:
+        return [x for x in player_data]
+
+@app.route('/funstat/player_by_author/<int:authorid>/<int:playerid>', subdomain=subdomain)
+def AuthorPlayerStatsHTML(authorid, playerid):
+    data = AuthorPlayerStats(authorid, playerid, False)
+    by_tournaments = {}
+    played = len(data)
+    for v in data:
+        # print(dict(v))
+
+        if not v["tournamentid"] in by_tournaments:
+            by_tournaments[v["tournamentid"]] = {"id": v["tournamentid"], "name": v["name"], "teamname": v["teamname"],"teamid": v["teamid"], "teamrating":v["teamrating"], "questions":[], "got":0, "estimation":0}
+        by_tournaments[v["tournamentid"]]["questions"].append({"qid": v["questionid"], "got": v["mask"][v["questionid"]-1] if len(v["mask"]) >= v["questionid"] else "U", "hardnes": v["hardnes"], "chance":rt.ELO(v["teamrating"], v["hardnes"]), "gqid":v["gqid"]})
+        by_tournaments[v["tournamentid"]]["got"] += (v["mask"][v["questionid"]-1] == "1" if len(v["mask"]) >= v["questionid"] else 0)
+        by_tournaments[v["tournamentid"]]["estimation"] += rt.ELO(v["teamrating"], v["hardnes"])
+    return render_template("playerauthorstat.html", by_tournaments=by_tournaments, played = played)
+
+
+
 
 @app.route('/api/questions/<int:tournamentid>', subdomain=subdomain)
 def QuestionsHardnes(tournamentid, return_json = True):

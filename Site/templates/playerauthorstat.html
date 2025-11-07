@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <!-- <h2>{{playerid}} {{playername}}</h2> -->
+    <style>
+        .numbers-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(20px, 1fr));
+            gap: 5px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .number-container {
+            text-align: center;
+        }
+
+        .number-box {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0 auto 10px auto;
+            background: linear-gradient(to top, var(--color) 0%, var(--color) var(--percentage), transparent var(--percentage));
+        }
+
+        .percentage-label {
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+
+
+  <h2>Сыграно вопросов: {{played}}</h2>
+
+
+
+  <table id="deltas" class="table table-striped">
+    <thead>
+      <tr>
+        <th>Турнир</th>
+        <th>Команда</th>
+        <th>Прогноз</th>
+        <th>Отклонение от прогноза</th>
+        <th>Список вопросов</th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for t in by_tournaments %}
+        <tr>
+          <td ><a href="/tournament/{{t}}"> {{ by_tournaments[t].name }}</a></td>
+          <td ><a href="/teams/{{by_tournaments[t].teamid}}">{{ by_tournaments[t].teamname }}</a></td>
+          <td >{{ "%.2f"|format(by_tournaments[t].estimation) }}</td>
+          <td >{{ "%+.2f"|format(by_tournaments[t].got - by_tournaments[t].estimation) }}</td>
+          <td > 
+            <div class="numbers-list">
+            {% for q in by_tournaments[t].questions %}
+            <a href="https://gotquestions.online/question/{{q.gqid}}">
+            {% if (q.got == "1") %}
+            <div class="number-container"><div class="number-box" style="--percentage: {{q.chance*100}}%; --color: lightgreen;">{{q.qid}} </div></div>
+            {% else %}
+            <div class="number-container"><div class="number-box" style="--percentage: {{100 - q.chance*100}}%; --color: red;">{{q.qid}}</div></div>
+            {% endif %}
+            </a>
+{% endfor %}</div></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+  </table>
+
+
+{% endblock %}
