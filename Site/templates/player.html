@@ -53,7 +53,7 @@
         <tr>
           <td><a href="/tournament/{{ delta.tournamentid }}">{{ delta.name }}</a></td>
           <td><a href="/teams/{{ delta.teamid }}">{{ delta.teamname }}</a></td>
-          <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ "%.2f"|format(delta.totalquestions - delta.predictedquestions) if delta.deltarating is not none else "Нет данных"}}</a></td>
+          <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ "%.2f"|format(delta.totalquestions - delta.predictedquestions) if delta.totalquestions is not none or delta.predictedquestions is none else "Нет данных"}}</a></td>
           <td><a href="/tournament/{{ delta.tournamentid }}#{{delta.teamid}}">{{ "%.2f"|format(delta.deltarating) if delta.deltarating is not none else "Нет данных"}}</a></td>
         </tr>
 

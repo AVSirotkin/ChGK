@@ -4,8 +4,8 @@ from flask import Flask, render_template, request, Response, jsonify
 # from flask_sqlalchemy import SQLAlchemy
 # from datatables import ColumnDT, DataTables
 
-import datetime
 import time
+import datetime
 import sys
 sys.path.append('../API/')
 sys.path.append('../Ratings')
@@ -267,11 +267,20 @@ def Calculate():
     #teams -- list of lists of players id
     #
 
+    teams = None
     teams_info = request.args.get('teams')
-    teams = json.loads(teams_info)
-    tournamets = request.args.get('tournaments')
-    tournametsid = json.loads(tournamets)
+    if not teams_info is None:
+        teams = json.loads(teams_info)
     
+    tournamets = request.args.get('tournaments')
+    tournametsid = None
+    if not tournamets is None:
+        tournametsid = json.loads(tournamets)
+    
+    release = request.args.get('release')
+    if release in None:
+        release = rt.season_by_datetime(datetime.today())
+
     result = []
     
     used_rates = []
@@ -280,7 +289,7 @@ def Calculate():
         for t in teams:
             used_rates.append([])
             for plid in t:
-                used_rates[-1].append(PlayerRatesLast(plid, False))
+                used_rates[-1].append(PlayerRatesRelease(plid, release, False))
             team_rates.append(rt.independed_ELO(sorted(used_rates[-1], reverse=True)[:6]))
             result.append({"PlayerRates":used_rates[-1], "TeamRating":team_rates[-1]})
     team_gets = None
@@ -366,11 +375,23 @@ def PlayerRatesLast(playerid, return_json = True):
             return 1000
 
 @app.route('/api/player/<int:playerid>/<int:releaseid>', subdomain=subdomain)
-def PlayerRatesRelease(playerid, releaseid):
+def PlayerRatesRelease(playerid, releaseid, return_json = True):
+    result = None
     conn = get_db_connection()
-    ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' AND releaseid = '+ str(releaseid) +' ORDER BY releaseid DESC')
-    # print(ratings)
-    return json.dumps({x["releaseid"]:x["playerrating"] for x in ratings})
+    ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' AND releaseid = '+ str(releaseid) +' ORDER BY releaseid DESC').fetchall()
+    if len(ratings) == 0:
+        mm_releases = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
+        if len(mm_releases) == 0:
+            result = 1000
+        if releaseid > mm_releases[0]["releaseid"]:
+            result = mm_releases[0]["playerrating"]
+        else:
+            result = 1000
+    else:
+        result = ratings[0]["playerrating"]
+    if return_json:
+        return json.dumps(result)
+    return(result)
 
 
 @app.route('/', subdomain=subdomain)
