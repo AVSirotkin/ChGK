@@ -278,9 +278,9 @@ def Calculate():
         tournametsid = json.loads(tournamets)
     
     release = request.args.get('release')
-    if release in None:
-        release = rt.season_by_datetime(datetime.today())
-
+    if release is None:
+        release = rt.season_by_datetime(datetime.datetime.today())
+    release = int(release)
     result = []
     
     used_rates = []
@@ -381,9 +381,10 @@ def PlayerRatesRelease(playerid, releaseid, return_json = True):
     ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' AND releaseid = '+ str(releaseid) +' ORDER BY releaseid DESC').fetchall()
     if len(ratings) == 0:
         mm_releases = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
+        print(mm_releases[0]["releaseid"], type(mm_releases[0]["releaseid"]), type(releaseid))
         if len(mm_releases) == 0:
             result = 1000
-        if releaseid > mm_releases[0]["releaseid"]:
+        elif releaseid > mm_releases[0]["releaseid"]:
             result = mm_releases[0]["playerrating"]
         else:
             result = 1000
