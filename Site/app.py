@@ -381,7 +381,6 @@ def PlayerRatesRelease(playerid, releaseid, return_json = True):
     ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' AND releaseid = '+ str(releaseid) +' ORDER BY releaseid DESC').fetchall()
     if len(ratings) == 0:
         mm_releases = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC').fetchall()
-        print(mm_releases[0]["releaseid"], type(mm_releases[0]["releaseid"]), type(releaseid))
         if len(mm_releases) == 0:
             result = 1000
         elif releaseid > mm_releases[0]["releaseid"]:
@@ -613,6 +612,15 @@ def showTeamTournamentInfo(teamid, tournamentid, return_html = True):
     # return render_template("roster.html", roster=roster)
 
 
+@app.route("/friendship/<int:tournamentid>", subdomain=subdomain)
+def showPregeneratedFriendship(tournamentid):
+    if os.path.isfile(f"Site/templates/{subdomain}/friendship/{tournamentid}.html"): 
+        return render_template(f"{subdomain}/friendship/{tournamentid}.html")
+    else:
+        return "Прогноза для турнира "+str(tournamentid)+" не найдено"
+    # return render_template("predict.html",)
+
+
 @app.route("/predict/<int:tournamentid>", subdomain=subdomain)
 def showPregeneratedPrediction(tournamentid):
     if os.path.isfile(f"Site/templates/predictions/{tournamentid}.html"): 
@@ -620,9 +628,6 @@ def showPregeneratedPrediction(tournamentid):
     else:
         return "Прогноза для турнира "+str(tournamentid)+" не найдено"
     # return render_template("predict.html",)
-
-
-
 
 
 
