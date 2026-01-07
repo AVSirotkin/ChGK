@@ -687,7 +687,7 @@ def showPregeneratedAuthorStats(authorid):
 @app.route("/funstat/by_series/<int:authorid>", subdomain=subdomain)
 def showPregeneratedSeriesStats(authorid):
     if os.path.isfile(f"Site/templates/funstat/by_series/{authorid}.html"): 
-        return render_template(f"funstat/by_author/{authorid}.html")
+        return render_template(f"funstat/by_series/{authorid}.html")
     else:
         return "Статистики по серии с id "+str(authorid)+" нет"
     # return render_template("predict.html",)
