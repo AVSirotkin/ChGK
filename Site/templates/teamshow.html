@@ -59,18 +59,31 @@ function get_info(question_prob) {
     function elo(a,b){
         return 1/(1+Math.pow(10,(b-a)/400))
     }
-    function full_predict(rate, q_hardnes){
+    function full_predict(rate, q_hardnes, mask){
         // console.log(rate, q_hardnes[0])
         let probs = [[100]]
         n = q_hardnes.length
         // console.log(probs[0])
 
         for(i=0; i<n ;i++){
-            probs.push([probs[i][0]*elo(q_hardnes[i], rate)])
-            for(j=0; j<i; j++){
-                probs[i+1].push(probs[i][j+1]*elo(q_hardnes[i], rate) + probs[i][j]*elo(rate, q_hardnes[i]))
+            if (mask[i] == "-"){
+                probs.push([probs[i][0]])
+            } else {
+                probs.push([probs[i][0]*elo(q_hardnes[i], rate)])
             }
-            probs[i+1].push(probs[i][i]*elo(rate, q_hardnes[i]))
+            for(j=0; j<i; j++){
+                if (mask[i] == "-"){
+                    probs[i+1].push(probs[i][j+1])
+                }
+                else {
+                    probs[i+1].push(probs[i][j+1]*elo(q_hardnes[i], rate) + probs[i][j]*elo(rate, q_hardnes[i]))
+                }
+            }
+            if (mask[i] == "-"){
+                probs[i+1].push(0.0)
+            } else {
+                probs[i+1].push(probs[i][i]*elo(rate, q_hardnes[i]))
+            }
             // console.log(probs[i])        
         }
 
@@ -104,7 +117,7 @@ function get_info(question_prob) {
         for (i = 0; i < team_res.mask.length; i++){
             // table.row.add({"Номер вопроса":i+1, "Вероятность взять":elo(team_rates.teamrating, q_hardnes[i])*100, "Взят":team_res.mask[i]})
             qn = i + 1
-            el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> <td>"+ (((team_res.mask[i]=="1"?10000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000))/100) +"  </td> </tr>"
+            el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + (team_res.mask[i]!="-")*Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> <td>"+ (team_res.mask[i]!="-")*(((team_res.mask[i]=="1"?10000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000))/100) +"  </td> </tr>"
         }
         // table.draw()
 
@@ -129,7 +142,7 @@ function get_info(question_prob) {
     // console.log(q_hardnes)
     // console.log(real_get)
     
-    let get_prob = full_predict(team_rates.teamrating, q_hardnes)
+    let get_prob = full_predict(team_rates.teamrating, q_hardnes, team_res.mask)
 
     TESTER = document.getElementById('team_plot');
    //  console.log(TESTER)
@@ -209,7 +222,7 @@ function get_info(question_prob) {
             // table.row.add({"Номер вопроса":i+1, "Вероятность взять":elo(team_rates.teamrating, q_hardnes[i])*100, "Взят":team_res.mask[i]})
             qn = i + 1
             draw_data_wf.x.push(i+1)
-            draw_data_wf.y.push((((team_res.mask[i]=="1"?1000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*1000))/1000))
+            draw_data_wf.y.push((((team_res.mask[i]=="1"?1000:0) - (team_res.mask[i]!="-")*Math.round(elo(team_rates.teamrating, q_hardnes[i])*1000))/1000))
     
             // el.innerHTML += "<tr> <td> "+ qn + "</td> <td> " + Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000)/100 + "</td> <td>" + team_res.mask[i] + "</td> <td>"+ (((team_res.mask[i]=="1"?10000:0) - Math.round(elo(team_rates.teamrating, q_hardnes[i])*10000))/100) +"  </td> </tr>"
         }
