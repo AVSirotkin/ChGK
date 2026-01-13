@@ -98,7 +98,26 @@ class ChGK_API_connector:
             page += 1
             next = (len(infoA)==500)
         return res
+    
  
+    def get_one_page_of_tournaments(self, page, size, suffix = "", max_attempt = 5):
+        print(datetime.now(), BASE_CHGK_API_URL+"/tournaments?page="+str(page)+"&itemsPerPage="+str(size)+suffix)
+        info = None
+        status = 0
+        while max_attempt > 0:
+            max_attempt -= 1
+            try:
+                r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page)+"&itemsPerPage="+str(size)+suffix, headers={'accept': 'application/json'})
+            except Exception as e:
+                print("someting BAD!!! We will wait 5 seconds and retry", e)
+                time.sleep(5)
+            else:
+                status = r.status_code
+                if r.status_code == 200:
+                    info = r.json()
+        return(status, info)
+
+
     def get_all_tournaments(self, page = 1, startdate_after = "", last_edit_date = ""):
         res = []
         next = True
@@ -109,34 +128,31 @@ class ChGK_API_connector:
         if len(last_edit_date):
             suffix += "&lastEditDate[after]="+last_edit_date
 
+        size = 512
+        cur_size = size
+        cur_page = page
         while next:
-            print(datetime.now(), BASE_CHGK_API_URL+"/tournaments?page="+str(page)+"&itemsPerPage=100"+suffix)
-            try:
-                r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page)+"&itemsPerPage=100"+suffix, headers={'accept': 'application/json'})
-            except:
-                print("someting BAD!!! We will wait 5 seconds and retry")
-                time.sleep(5)
-            else:
-                if r.status_code == 200:
-                    infoA = r.json()
-                    res += infoA
-                    page += 1
-                    next = (len(infoA)==100)
+            next = False
+            status, info = self.get_one_page_of_tournaments(cur_page, cur_size, suffix)
+            if status == 200:
+                res += info
+                if len(info) == cur_size:
+                    next = True
+                    cur_page += 1
+                while cur_size < size:
+                    if cur_page % 4 == 1:
+                        cur_size *= 4
+                        cur_page = (cur_page - 1)//4 + 1
+                    else:
+                        break 
+            elif status == 500:
+                if cur_size > 4:
+                    cur_page = (cur_page - 1) * 4 + 1
+                    cur_size = cur_size // 4
+                    next=True
                 else:
-                    print(f"bad respose code {r.status_code}")
-                    
-                    if r.status_code == 500:
-                        for j in range(10):
-                            r = requests.get(BASE_CHGK_API_URL+"/tournaments?page="+str(page*10-9+j)+"&itemsPerPage=10"+suffix, headers={'accept': 'application/json'})
-                            infoA = r.json()
-                            res += infoA
-                            if len(infoA) < 10:
-                                break
-                        page += 1
-                        next = (len(infoA)==10)
-
-                    time.sleep(5)
-
+                    print("TOO SMALL PAGES")
+ 
         return res
 
     def tournament_results(self, idtournament, forced = False, quiet = True, max_attempt = 10):
