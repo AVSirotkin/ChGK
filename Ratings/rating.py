@@ -2,6 +2,7 @@ from copy import deepcopy
 import os
 from scipy.stats import spearmanr
 from datetime import datetime, timedelta, date
+import time
 import json
 import math
 import sys
@@ -207,8 +208,10 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
     places = []
     players_num = {}
     total_gets = 0
+    masks = {}
     
     max_qid = 0
+
 
     Q_WARN  = True
     individual_data = DB.execute(f"SELECT teamid from data.results WHERE tournamentid =={tournamentid} and mask IS NOT NULL").fetchall()
@@ -249,6 +252,7 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
                 # continue
             else:
                 team_gets[tm[0]] = 0
+                masks[tm[0]] = tm[2]
                 for i, q in enumerate(tm[2]):
                     qid = i + 1
                     if not qid in question_gets:
@@ -293,7 +297,7 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
             Q_hardnes = 10000
         
         for q in question_gets:
-            question_values.append(max_like(1000, local_teams_rates, question_gets[q], False)) #TODO: Сделать индивидуальный обход вопросов (частично снятый)
+            question_values.append(max_like(1000, question_attempts[q], question_gets[q], False)) 
     else:
         if question_number > 0:
             qval = max_like(1000, local_teams_rates, total_gets/question_number, False)
@@ -320,7 +324,10 @@ def process_one_tournament_from_DB(DB, tournamentid, players_rating, individual_
         if team_gets[tm] is None:
             team_delta[tm] = None    
         else:
-            team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], question_values)) * tournament_weight
+            if tm in masks:
+                team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], [x for x,m in zip(question_values, masks[tm]) if m !="-"])) * tournament_weight
+            else:
+                team_delta[tm] = (team_gets[tm] - ELO_estimate(player_based_team_ratings[tm], question_values)) * tournament_weight
             w = 1.
             if players_num[tm] > 6:
                 w = w*6 /players_num[tm]
@@ -697,9 +704,14 @@ def process_all_data(rating_db, data_db, start_from_release = 1, in_memory_db = 
             for tm in team_results:
                 if tm[0] in delta:
                     if (not delta[tm[0]] is None):
-                        atmost, atleast = estimate_p_values(delta[tm[0]], qv, tm[1]) if (not (tm[1] == None)) else (None, None)
-                        team_perf = max_like(1000, qv, tm[1]) if (not (tm[1] == None)) else None
-                        tournamentrating_data.append((t[0], tm[0], delta[tm[0]], ELO_estimate(delta[tm[0]], qv), atleast, atmost, team_perf))
+                        if not tm[2] is None: 
+                            atmost, atleast = estimate_p_values(delta[tm[0]], [q for q, m in zip(qv, tm[2]) if m != "-"], tm[1]) if (not (tm[1] == None)) else (None, None)
+                            team_perf = max_like(1000, [q for q, m in zip(qv, tm[2]) if m != "-"], tm[1]) if (not (tm[1] == None)) else None
+                            tournamentrating_data.append((t[0], tm[0], delta[tm[0]], ELO_estimate(delta[tm[0]], [q for q, m in zip(qv, tm[2]) if m != "-"]), atleast, atmost, team_perf))
+                        else:
+                            atmost, atleast = estimate_p_values(delta[tm[0]], qv, tm[1]) if (not (tm[1] == None)) else (None, None)
+                            team_perf = max_like(1000, qv, tm[1]) if (not (tm[1] == None)) else None
+                            tournamentrating_data.append((t[0], tm[0], delta[tm[0]], ELO_estimate(delta[tm[0]], qv), atleast, atmost, team_perf))
 
                     q_last = 0
                     if (not tm[2] is None) and (not delta[tm[0]] is None):
@@ -707,9 +719,9 @@ def process_all_data(rating_db, data_db, start_from_release = 1, in_memory_db = 
                             leg_N = QQuantity[qqt]
                             q_cur = q_last + leg_N
                             leg_Total = sum([x=="1" for x in tm[2][q_last:q_cur]])
-                            atmost, atleast = estimate_p_values(delta[tm[0]], qv[q_last:q_cur], leg_Total)
+                            atmost, atleast = estimate_p_values(delta[tm[0]], [q for q, m in zip(qv[q_last:q_cur], tm[2][q_last:q_cur]) if m != "-"], leg_Total)
 
-                            legs_data.append((t[0], tm[0], int(qqt), leg_N, tm[2][q_last:q_cur],leg_Total, ELO_estimate(delta[tm[0]], qv[q_last:q_cur]), atleast, atmost))
+                            legs_data.append((t[0], tm[0], int(qqt), leg_N, tm[2][q_last:q_cur],leg_Total, ELO_estimate(delta[tm[0]], [q for q, m in zip(qv[q_last:q_cur], tm[2][q_last:q_cur]) if m != "-"]), atleast, atmost))
                             q_last = q_cur
                             # bytes = f.write(my_t["current"]["name"] + "; " +str(delta[my_t["team"]["id"]])+ "; " +str(len(my_t["teamMembers"])) +"; "+ str(my_t["position"]) + "; " + str(team_places.index(my_t["team"]["id"])+1)+"; " + str(my_t["questionsTotal"]) + "; " + str(ELO_estimate(delta[my_t["team"]["id"]], qv))+"\n")
             
@@ -886,11 +898,17 @@ def update_tournaments_db(data_db):
     logger.info(f"Tournament update from {updated}")
 
     test_new = connector.get_all_tournaments(startdate_after="2021-09-01", last_edit_date=updated) 
+    start_time = time.time()
+    request_time = start_time - start_time
+    put_into_time = start_time - start_time
+    insert_tournaments_time = start_time - start_time
     
     for t in tqdm(test_new):
+        s1 = time.time()
         rs = connector.tournament_results(t["id"], True)
+        s2 = time.time()
         put_tournament_results_into_DB(t["id"], rs, conn)
-        
+        s3 = time.time()
         if "synchData" in t:
             if "hideQuestionsTo" in t["synchData"]:
                 t["hideQuestionsTo"] = t["synchData"]["hideQuestionsTo"]
@@ -906,8 +924,13 @@ def update_tournaments_db(data_db):
         
         conn.execute(f"INSERT OR REPLACE into tournaments (tournamentid, name, dateStart, dateEnd, typeoft_id, type, maii_rating, longName, lastSynchDate, hideQuestionsTo, questionQty, fulljson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                            (t["id"], t["name"], t["dateStart"], t["dateEnd"], t["type"]["id"], t["type"]["name"], t["maiiRating"], t["longName"], current_date, t["hideQuestionsTo"], None if not "questionQty" in t else json.dumps(t["questionQty"]), json.dumps(t)))
-        
-     
+        s4 = time.time()
+        request_time += (s2-s1)
+        put_into_time += (s3-s2)
+        insert_tournaments_time += (s4-s3)
+
+    print(f"Basic update time {s4 - start_time}:\nGet: {request_time} \nPut {put_into_time}\nInsert: {insert_tournaments_time}")
+
     to_refresh = conn.execute("SELECT tournamentid, name, dateEnd from tournaments where hideQuestionsTo > lastSynchDate and hideQuestionsTo < ?", (current_date,))
     
     for t in to_refresh:
