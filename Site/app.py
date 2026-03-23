@@ -257,7 +257,11 @@ def apiFullTournamentFullInfo(tournamentid):
 
 @app.route('/teamshow/<int:tournamentid>/<int:teamid>', subdomain=subdomain)
 def TeamShow(tournamentid, teamid):
-    return render_template("teamshow.html", tournamentid=tournamentid, teamid = teamid)
+    conn = get_db_connection()
+    tournament_info = conn.execute('SELECT * FROM data.tournaments WHERE tournaments.tournamentid = ?', (tournamentid,)).fetchone() 
+    team_info = conn.execute('SELECT * FROM data.teams WHERE data.teams.teamid = ?',(teamid,)).fetchone() 
+
+    return render_template("teamshow.html", tournamentid=tournamentid, teamid = teamid, tournament_info = tournament_info, team_info = team_info)
 
 
 
@@ -629,9 +633,6 @@ def showPregeneratedPrediction(tournamentid):
         return "Прогноза для турнира "+str(tournamentid)+" не найдено"
     # return render_template("predict.html",)
 
-
-
-
 @app.route("/predict/<int:tournamentid>/<int:questionstournamentid>", subdomain=subdomain)
 def showPrediction(tournamentid, questionstournamentid):
     
@@ -671,6 +672,16 @@ def showPrediction(tournamentid, questionstournamentid):
     else:
         return "Данных о турнире "+str(tournamentid)+" не найдено"
     # return render_template("predict.html",)
+
+@app.route("/meta/<int:tournamentid>", subdomain=subdomain)
+def showPregeneratedMeta(tournamentid):
+    if os.path.isfile(f"Site/templates/meta/{tournamentid}.html"): 
+        return render_template(f"meta/{tournamentid}.html")
+    else:
+        return "Обобщенного турнира с id "+str(tournamentid)+" не найдено"
+    # return render_template("predict.html",)
+
+
 
 @app.route("/funstat/rozhkov", subdomain=subdomain)
 def showRozhkov():
@@ -776,6 +787,7 @@ def showTeamInfo(teamid):
     else:
         team_rating = 0
     releaseid = rt.season_by_datetime(datetime.datetime.now())
+    print(releaseid)
     place_req = conn.execute(f"SELECT teambaserating, place FROM teambaseratings WHERE teamid={teamid} and releaseid = {releaseid}").fetchall()
 
     if len(place_req) > 0:
