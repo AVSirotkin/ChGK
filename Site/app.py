@@ -36,6 +36,7 @@ if __name__ == "__main__":
     
     data_db = config['DATABASES']['data_db']
     rating_db = config['DATABASES']['ratings_db']
+    online_db = "./Output/online.db"
     
     website_url = config['SITE']['domain']
     port = int(config['SITE']['port'])
@@ -56,6 +57,12 @@ def get_db_connection(factory = True):
         conn.row_factory = sqlite3.Row
     return conn
 
+def get_online_db_connection(factory = True):
+    # conn = sqlite3.connect('file:Output/rating_for_site.db?immutable=1', uri=True)
+    conn = sqlite3.connect(f'file:{online_db}?immutable=1', uri=True)
+    if factory:
+        conn.row_factory = sqlite3.Row
+    return conn
 
 # @app.route('/', subdomain=subdomain)
 # def ratingindex():
@@ -516,6 +523,36 @@ def showTournamentInfo(tournamentid):
         return render_template("tournament.html", tourresults=tournaments, tournamentid = tournamentid, tournament_info = tournament_info)
     else:
         return "Данных о турнире "+str(tournamentid)+" не найдено"
+
+@app.route("/onlinetournament/<int:tournamentid>", subdomain=subdomain)
+def showOnlineTournamentInfo(tournamentid):
+    ts = time.time()
+    conn = get_db_connection()
+    print("conn", time.time()-ts)
+
+
+    conn2 = get_online_db_connection()
+
+    tournament_info = conn.execute('SELECT * FROM data.tournaments as tournaments LEFT JOIN tournamentshardnes ON tournaments.tournamentid == tournamentshardnes.tournamentid WHERE tournaments.tournamentid = '+str(tournamentid)).fetchone() 
+
+    tournaments = conn2.execute('SELECT * FROM results '+
+    ' WHERE tournamentid = '+str(tournamentid) + #+
+    ' ORDER BY totalquestions DESC, teamrating DESC;'
+    ).fetchall()
+    
+    # print(tuple(tournaments[0]))
+    # print(tournaments[0].keys())
+    # print(tournaments[0]['teamid'])
+    conn.close()
+    conn2.close()
+    print("All time", time.time()-ts)
+    
+    if len(tournaments) > 0: 
+        return render_template("online_tournament.html", tourresults=tournaments, tournamentid = tournamentid, tournament_info = tournament_info)
+    else:
+        return "Трансляции турнира "+str(tournamentid)+" не найдено"
+
+
 
 
 @app.route("/tournament_full/<int:tournamentid>", subdomain=subdomain)
