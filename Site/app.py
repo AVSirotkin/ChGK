@@ -368,6 +368,22 @@ def PlayerDetailedRates(playerid, return_json = True):
     else:
         return (deltas, ratings, player)
         
+@app.route('/api/teamrating/<int:teamid>', subdomain=subdomain)
+@app.route('/api/teamrating/<int:teamid>/last', subdomain=subdomain)
+@app.route('/api/teamrating/<int:teamid>/<int:releaseid>', subdomain=subdomain)
+def APITeamBaseRates(teamid, releaseid = None):
+    conn = get_db_connection()
+    if releaseid is None:
+        ratings = conn.execute('SELECT releaseid, teambaserating FROM teambaseratings WHERE teamid = '+str(teamid)+' ORDER BY releaseid DESC').fetchone()
+    else:
+        ratings = conn.execute('SELECT releaseid, teambaserating FROM teambaseratings WHERE teamid = '+str(teamid)+' AND releaseid = '+ str(releaseid)).fetchone()
+        if ratings is None:
+            ratings = conn.execute('SELECT releaseid, teambaserating FROM teambaseratings WHERE teamid = '+str(teamid) +' AND releaseid <= '+ str(releaseid) +' ORDER BY releaseid DESC').fetchone()
+    if not ratings is None:
+        return(str(ratings["teambaserating"]))
+    else: 
+        return("У команды нет базового рейтинга")
+
 
 
 @app.route('/api/player/<int:playerid>/last', subdomain=subdomain)
