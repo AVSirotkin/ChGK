@@ -53,6 +53,7 @@ def get_db_connection(factory = True):
     # conn = sqlite3.connect('file:Output/rating_for_site.db?immutable=1', uri=True)
     conn = sqlite3.connect(f'file:{rating_db}?immutable=1', uri=True)
     conn.execute("ATTACH DATABASE ? AS data;", (data_db,))
+    conn.create_function("lower_ru", 1, lambda s: s.lower() if isinstance(s, str) else s)
     if factory:
         conn.row_factory = sqlite3.Row
     return conn
@@ -158,6 +159,15 @@ def AuthorPlayerStatsHTML(authorid, playerid):
     return render_template("playerauthorstat.html", by_tournaments=by_tournaments, played = played)
 
 
+# @app.route('/playersearch', subdomain=subdomain)
+# def showPlayerSearch():
+#     return render_template("playersearch.html")
+
+
+@app.route('/testers', subdomain=subdomain)
+def showTesters():
+    return render_template("testers.html")
+
 
 
 @app.route('/api/questions/<int:tournamentid>', subdomain=subdomain)
@@ -203,6 +213,45 @@ def PlayerRates(playerid):
     conn = get_db_connection()
     ratings = conn.execute('SELECT releaseid, playerrating FROM playerratings WHERE playerid = '+str(playerid)+' ORDER BY releaseid DESC')
     return json.dumps({x["releaseid"]:x["playerrating"] for x in ratings})
+
+@app.route('/api/players/search', subdomain=subdomain)
+def SearchPlayers():
+    q = (request.args.get('q') or '').strip()
+    try:
+        limit = min(int(request.args.get('limit', 15)), 50)
+    except ValueError:
+        limit = 15
+
+    if not q or len(q) > 100:
+        return jsonify([])
+
+    conn = get_db_connection()
+    like = f'%{q.lower()}%'
+    is_numeric = q.isdigit()
+
+    if is_numeric:
+        rows = conn.execute(
+            "SELECT playerid, fullname, surname, name FROM data.players "
+            "WHERE playerid = ? "
+            "   OR lower_ru(surname) LIKE ? "
+            "   OR lower_ru(fullname) LIKE ? "
+            "ORDER BY CASE WHEN playerid = ? THEN 0 ELSE 1 END, surname, name "
+            "LIMIT ?",
+            (int(q), like, like, int(q), limit)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT playerid, fullname, surname, name FROM data.players "
+            "WHERE lower_ru(surname) LIKE ? "
+            "   OR lower_ru(fullname) LIKE ? "
+            "ORDER BY surname, name "
+            "LIMIT ?",
+            (like, like, limit)
+        ).fetchall()
+
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
 
 @app.route('/api/tournamentteamresult/<int:tournamentid>/<int:teamid>', subdomain=subdomain)
 def TeamResult(tournamentid, teamid):
@@ -274,51 +323,77 @@ def TeamShow(tournamentid, teamid):
 
 @app.route('/api/calculate', subdomain=subdomain)
 def Calculate():
-    #base parameters for calculate:
-    #teams -- list of lists of players id
-    #
-
     teams = None
     teams_info = request.args.get('teams')
     if not teams_info is None:
         teams = json.loads(teams_info)
-    
+
     tournamets = request.args.get('tournaments')
     tournametsid = None
     if not tournamets is None:
         tournametsid = json.loads(tournamets)
-    
+
     release = request.args.get('release')
     if release is None:
         release = rt.season_by_datetime(datetime.datetime.today())
     release = int(release)
+
+    # NEW: оценка места — считаем только если явно попросили
+    return_estimated_place = (
+        (request.args.get('returnestimatedplace') or '').lower() == 'true'
+    )
+
     result = []
-    
     used_rates = []
     team_rates = []
-    if not teams is None: 
+
+    if not teams is None:
+        conn = get_db_connection() if return_estimated_place else None
+
         for t in teams:
             used_rates.append([])
             for plid in t:
                 used_rates[-1].append(PlayerRatesRelease(plid, release, False))
-            team_rates.append(rt.independed_ELO(sorted(used_rates[-1], reverse=True)[:6]))
-            result.append({"PlayerRates":used_rates[-1], "TeamRating":team_rates[-1]})
+
+            team_rates.append(
+                rt.independed_ELO(sorted(used_rates[-1], reverse=True)[:6])
+            )
+
+            entry = {
+                "PlayerRates": used_rates[-1],
+                "TeamRating":  team_rates[-1],
+            }
+
+            if return_estimated_place:
+                # Наименьшее place среди команд с меньшим team_rating.
+                # Логика: если команда слабее нас, её место >= нашего,
+                # значит минимум по таким place — верхняя граница нашего места.
+                row = conn.execute(
+                    'SELECT MIN(place) AS est FROM teambaseratings '
+                    'WHERE releaseid = ? AND teambaserating < ?',
+                    (release, team_rates[-1])
+                ).fetchone()
+
+                est = row["est"] if (row is not None and row["est"] is not None) else 5000
+                entry["EstimatedPlace"] = int(est)
+
+            result.append(entry)
+
+        if conn is not None:
+            conn.close()
+
     team_gets = None
-
     if not tournametsid is None:
-        team_gets = [[0]*len(tournametsid) for x in  range(len(team_rates))]
-
+        team_gets = [[0] * len(tournametsid) for x in range(len(team_rates))]
         for i, tid in enumerate(tournametsid):
             qh = QuestionsHardnes(tid, False)
             if len(qh) > 0:
                 for j, rate in enumerate(team_rates):
                     team_gets[j][i] = rt.ELO_estimate(rate, qh)
-    
         for j, rate in enumerate(team_rates):
             result[j]["TeamEstimates"] = team_gets[j]
-
+    print(result)
     return json.dumps(result)
-
 
 @app.route('/api/player/<int:playerid>/full', subdomain=subdomain)
 def PlayerDetailedRates(playerid, return_json = True):
@@ -430,6 +505,7 @@ def showAllTeams(season = 0):
     if season == 0:
         tmp = conn.execute('SELECT MAX(releaseid) as releaseid FROM playerratings').fetchall()
         season = int(tmp[0]["releaseid"])
+        print("SEASON", season)
     t1 = time.time()
     print(page, t1-ts)
     ratings = conn.execute('SELECT ROW_NUMBER() OVER(ORDER BY teambaseratings.teambaserating DESC) AS position, teams.teamid as teamid, teams.teamname as name, teambaseratings.teambaserating as teamrating, teambaseratings.releaseid as releaseid FROM teambaseratings JOIN data.teams as teams ON teambaseratings.teamid=teams.teamid WHERE releaseid='+str(season)+' ORDER BY teamrating DESC LIMIT 100 OFFSET '+str(100*(page-1))).fetchall()
@@ -811,6 +887,10 @@ def gatherTeamInfo(teamid, return_json = True):
     ' ORDER BY tournaments.dateEnd DESC'
     )#.fetchall()
     team_data["tournaments"] = [dict(x) for x in tournaments]
+    
+    roster = conn.execute('SELECT * FROM data.roster WHERE teamid = ?',(teamid,))
+    team_data["rosters"] = [dict(x) for x in roster]
+
     if return_json:
         return json.dumps(team_data)
     else:

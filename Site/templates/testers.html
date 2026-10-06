@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Поиск игроков</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         max-width: 720px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 22px; }
+  .ps-wrap { position: relative; }
+  .ps-input { width: 100%; box-sizing: border-box; padding: 10px 12px;
+              font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+  .ps-input:focus { outline: none; border-color: #4a90e2; }
+  .ps-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin: 4px 0 0;
+                 padding: 0; list-style: none; background: #fff;
+                 border: 1px solid #ddd; border-radius: 6px; max-height: 320px;
+                 overflow-y: auto; z-index: 20;
+                 box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+  .ps-item { padding: 10px 12px; border-bottom: 1px solid #f0f0f0;
+             cursor: pointer; display: flex; justify-content: space-between;
+             gap: 12px; align-items: center; }
+  .ps-item:last-child { border-bottom: none; }
+  .ps-item:hover { background: #f5f8ff; }
+  .ps-item.in-team { opacity: .55; cursor: default; }
+  .ps-item.in-team:hover { background: transparent; }
+  .ps-meta { color: #888; font-size: 13px; }
+  .ps-empty { padding: 12px; color: #888; }
+
+  .ps-team-panel { margin-top: 28px; }
+  .ps-team-panel h2 { font-size: 18px; margin: 0 0 12px; }
+  .ps-team-item { display: flex; align-items: center; justify-content: space-between;
+                  gap: 12px; padding: 10px 14px; border: 1px solid #e3e3e3;
+                  border-radius: 6px; margin-bottom: 8px; background: #fafafa; }
+  .ps-team-name a { color: #1a3d8f; text-decoration: none; }
+  .ps-team-name a:hover { text-decoration: underline; }
+  .ps-team-right { display: flex; align-items: center; gap: 12px; }
+  .ps-player-rate { font-weight: 600; color: #2c3e50; min-width: 60px;
+                    text-align: right; font-variant-numeric: tabular-nums; }
+  .ps-btn-del { background: #e74c3c; color: #fff; border: none;
+                padding: 6px 12px; border-radius: 4px; cursor: pointer;
+                font-size: 14px; }
+  .ps-btn-del:hover { background: #c0392b; }
+  .ps-btn-clear { background: transparent; border: 1px solid #ccc;
+                  padding: 6px 12px; border-radius: 4px; cursor: pointer;
+                  color: #555; font-size: 14px; margin-top: 4px; }
+  .ps-actions { margin-top: 16px; display: flex; gap: 8px; }
+  .ps-actions button { padding: 8px 16px; border-radius: 6px; cursor: pointer;
+                       border: 1px solid #ccc; background: #fff; font-size: 14px; }
+  .ps-actions button.primary { background: #4a90e2; border-color: #4a90e2; color: #fff; }
+
+  .ps-team-rating-box { margin-top: 20px; padding: 14px 18px;
+                        background: #eef4ff; border: 1px solid #c9d9ff;
+                        border-radius: 8px; }
+  .ps-team-rating-box .ps-row { display: flex; align-items: baseline;
+                                justify-content: space-between; }
+  .ps-team-rating-box .ps-row + .ps-row { margin-top: 6px; }
+  .ps-team-rating-box .ps-label { color: #35507f; font-size: 15px; }
+  .ps-team-rating-box .ps-value { font-size: 26px; font-weight: 700;
+                                  color: #1a3d8f; font-variant-numeric: tabular-nums; }
+  .ps-team-rating-box .ps-value.place { font-size: 22px; color: #2e7d32; }
+  .ps-team-rating-box.loading { opacity: .6; }
+  .ps-error { color: #b00020; font-size: 14px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Поиск игроков</h1>
+<p>Введите ID, фамилию или часть ФИО. Клик по игроку — добавление в команду.</p>
+
+<div class="ps-wrap" id="psWrap">
+  <input class="ps-input" id="psInput" type="text" autocomplete="off"
+         placeholder="Например: 1234 или Иванов">
+  <ul class="ps-dropdown" id="psDropdown" style="display:none"></ul>
+</div>
+
+<div class="ps-team-panel" id="psTeamPanel" style="display:none">
+  <h2>Команда (<span id="psTeamCount">0</span>)</h2>
+  <div id="psTeamList"></div>
+
+  <div class="ps-team-rating-box" id="psTeamRatingBox" style="display:none">
+    <div class="ps-row">
+      <span class="ps-label">Сила команды</span>
+      <span class="ps-value" id="psTeamRating">—</span>
+    </div>
+    <div class="ps-row">
+      <span class="ps-label">Ожидаемое место</span>
+      <span class="ps-value place" id="psTeamPlace">—</span>
+    </div>
+  </div>
+  <div class="ps-error" id="psError" style="display:none"></div>
+
+  <div class="ps-actions">
+    <button class="ps-btn-clear" id="psClear">Очистить команду</button>
+    <button class="primary" id="psExport">Экспорт JSON</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'ps_team_players';   // было ps_cart_players
+  const input          = document.getElementById('psInput');
+  const dropdown       = document.getElementById('psDropdown');
+  const wrap           = document.getElementById('psWrap');
+  const teamPanel      = document.getElementById('psTeamPanel');
+  const teamList       = document.getElementById('psTeamList');
+  const teamCount      = document.getElementById('psTeamCount');
+  const teamRatingBox  = document.getElementById('psTeamRatingBox');
+  const teamRatingEl   = document.getElementById('psTeamRating');
+  const teamPlaceEl    = document.getElementById('psTeamPlace');
+  const errBox         = document.getElementById('psError');
+
+  // Команда: {playerid: {playerid, fullname, surname, name}} в localStorage
+  let team = {};
+  try { team = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; }
+  catch (e) { team = {}; }
+
+  // Рейтинги из /api/calculate (playerid -> число) + сила/место команды
+  let playerRates       = {};
+  let teamRatingValue   = null;
+  let teamEstimatedPlace = null;
+
+  function saveTeam() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(team));
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function fmtRate(v) {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    return Math.round(Number(v)).toString();
+  }
+
+  function renderTeam() {
+    const ids = Object.keys(team);
+    teamCount.textContent = ids.length;
+    teamPanel.style.display = ids.length ? 'block' : 'none';
+
+    teamList.innerHTML = ids.map(id => {
+      const p = team[id];
+      const label = p.fullname || `${p.surname || ''} ${p.name || ''}`.trim() || ('Игрок ' + id);
+      const rate = playerRates[id];
+      return `<div class="ps-team-item" data-id="${id}">
+        <div class="ps-team-name">
+          <a href="/player/${id}" target="_blank">#${id} — ${escapeHtml(label)}</a>
+        </div>
+        <div class="ps-team-right">
+          <span class="ps-player-rate" id="psRate-${id}">${fmtRate(rate)}</span>
+          <button class="ps-btn-del" data-remove="${id}">Удалить</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    if (teamRatingValue !== null || teamEstimatedPlace !== null) {
+      teamRatingBox.style.display = 'block';
+      teamRatingEl.textContent = teamRatingValue !== null ? fmtRate(teamRatingValue) : '—';
+      teamPlaceEl.textContent  = teamEstimatedPlace !== null ? teamEstimatedPlace : '—';
+    } else {
+      teamRatingBox.style.display = 'none';
+    }
+  }
+
+  // ------- Расчёт силы и места через /api/calculate -------
+
+  let calcToken = 0;
+  let calcTimer = null;
+
+  function scheduleCalc() {
+    clearTimeout(calcTimer);
+    calcTimer = setTimeout(runCalc, 200);
+  }
+
+  async function runCalc() {
+    const ids = Object.keys(team);
+    errBox.style.display = 'none';
+
+    if (!ids.length) {
+      playerRates = {};
+      teamRatingValue = null;
+      teamEstimatedPlace = null;
+      renderTeam();
+      return;
+    }
+
+    const myToken = ++calcToken;
+    teamRatingBox.style.display = 'block';
+    teamRatingBox.classList.add('loading');
+    if (teamRatingValue === null) teamRatingEl.textContent = '…';
+    if (teamEstimatedPlace === null) teamPlaceEl.textContent = '…';
+
+    const teamsParam = JSON.stringify([ids.map(x => Number(x))]);
+    const url = `/api/calculate?teams=${encodeURIComponent(teamsParam)}`
+              + `&returnestimatedplace=true`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      // Защита от гонок
+      if (myToken !== calcToken) return;
+
+      if (!Array.isArray(data) || data.length === 0) {
+        playerRates = {};
+        teamRatingValue = null;
+        teamEstimatedPlace = null;
+      } else {
+        const t = data[0];
+        const rates = Array.isArray(t.PlayerRates) ? t.PlayerRates : [];
+        playerRates = {};
+        ids.forEach((id, i) => {
+          if (rates[i] !== undefined) playerRates[id] = rates[i];
+        });
+        teamRatingValue    = (t.TeamRating    !== undefined) ? t.TeamRating    : null;
+        teamEstimatedPlace = (t.EstimatedPlace !== undefined) ? t.EstimatedPlace : null;
+      }
+      renderTeam();
+    } catch (e) {
+      if (myToken !== calcToken) return;
+      console.error(e);
+      errBox.textContent = 'Не удалось рассчитать команду: ' + e.message;
+      errBox.style.display = 'block';
+    } finally {
+      if (myToken === calcToken) teamRatingBox.classList.remove('loading');
+    }
+  }
+
+  // ------- Поиск игроков -------
+
+  let timer = null;
+  let lastQuery = '';
+
+  function closeDropdown() {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+  }
+
+  async function runSearch(q) {
+    lastQuery = q;
+    try {
+      const res = await fetch(`/api/players/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (q !== lastQuery) return;
+      renderDropdown(data);
+    } catch (e) {
+      console.error(e);
+      dropdown.innerHTML = '<li class="ps-empty">Ошибка запроса</li>';
+      dropdown.style.display = 'block';
+    }
+  }
+
+  function renderDropdown(players) {
+    if (!players.length) {
+      dropdown.innerHTML = '<li class="ps-empty">Ничего не найдено</li>';
+      dropdown.style.display = 'block';
+      return;
+    }
+    dropdown.innerHTML = players.map(p => {
+      const inTeam = !!team[p.playerid];
+      const label  = p.fullname || `${p.surname || ''} ${p.name || ''}`.trim();
+      const teamTag = p.team ? `<span class="ps-meta">${escapeHtml(p.team)}</span>` : '';
+      return `<li class="ps-item ${inTeam ? 'in-team' : ''}"
+                  data-id="${p.playerid}"
+                  data-fullname="${escapeHtml(p.fullname || '')}"
+                  data-surname="${escapeHtml(p.surname || '')}"
+                  data-name="${escapeHtml(p.name || '')}">
+        <span>#${p.playerid} — ${escapeHtml(label)}</span>
+        ${inTeam ? '<span class="ps-meta">✓ в команде</span>' : teamTag}
+      </li>`;
+    }).join('');
+    dropdown.style.display = 'block';
+  }
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    clearTimeout(timer);
+    if (!q) { closeDropdown(); return; }
+    timer = setTimeout(() => runSearch(q), 250);
+  });
+
+  input.addEventListener('focus', () => {
+    if (input.value.trim() && dropdown.innerHTML) dropdown.style.display = 'block';
+  });
+
+  dropdown.addEventListener('click', (e) => {
+    const li = e.target.closest('.ps-item');
+    if (!li) return;
+    const id = li.dataset.id;
+    if (team[id]) return;
+    team[id] = {
+      playerid: id,
+      fullname: li.dataset.fullname,
+      surname:  li.dataset.surname,
+      name:     li.dataset.name
+    };
+    saveTeam();
+    renderTeam();
+    scheduleCalc();
+    closeDropdown();
+    input.value = '';
+    input.focus();
+  });
+
+  teamList.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-remove]');
+    if (!btn) return;
+    delete team[btn.dataset.remove];
+    saveTeam();
+    renderTeam();
+    scheduleCalc();
+  });
+
+  document.getElementById('psClear').addEventListener('click', () => {
+    if (!confirm('Очистить команду?')) return;
+    team = {};
+    saveTeam();
+    renderTeam();
+    scheduleCalc();
+  });
+
+  document.getElementById('psExport').addEventListener('click', () => {
+    const list = Object.values(team).map(p => ({
+      ...p,
+      rating: playerRates[p.playerid] ?? null
+    }));
+    alert(JSON.stringify({
+      team_rating:     teamRatingValue,
+      estimated_place: teamEstimatedPlace,
+      players:         list
+    }, null, 2));
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!wrap.contains(e.target)) closeDropdown();
+  });
+
+  renderTeam();
+  if (Object.keys(team).length) scheduleCalc();
+})();
+</script>
+</body>
+</html>
